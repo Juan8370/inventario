@@ -88,8 +88,14 @@ pytest test/test_database.py -v
 
 ## 📚 Documentación
 
-- [Base de Datos](docs/database.md) - Documentación completa del esquema
-- API Docs - Disponible en `/docs` cuando el servidor esté corriendo
+- [Setup](docs/setup.md) - Puesta en marcha y ejecución
+- [Entorno](docs/env.md) - Variables de entorno (.env)
+- [API](docs/api.md) - Endpoints, códigos y payloads
+- [CRUD Genérico](docs/crud.md) - Uso de `CRUDBase`
+- [Testing](docs/testing.md) - Cómo ejecutar y qué cubren los tests
+- [Arquitectura](docs/architecture.md) - Estructura y flujo de la app
+- [Base de Datos](docs/database.md) - Esquema y relaciones
+- API interactiva - Disponible en `/docs` cuando el servidor está corriendo
 
 ## 🤝 Contribuciones
 
@@ -105,4 +111,4 @@ Este proyecto está bajo la Licencia MIT. Ver `LICENSE` para más detalles.
 
 ---
 
-**Desarrollado con ❤️ usando Python y FastAPI**
+Desarrollado con ❤️ usando Python y FastAPI

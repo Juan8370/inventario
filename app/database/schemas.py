@@ -1,4 +1,4 @@
-from pydantic import BaseModel, EmailStr, Field, validator, root_validator
+from pydantic import BaseModel, EmailStr, Field, field_validator, model_validator, field_serializer
 from typing import Optional, List
 from datetime import datetime
 from decimal import Decimal
@@ -138,13 +138,15 @@ class EmpresaBase(BaseModel):
     tipo_empresa_id: int = Field(..., gt=0, description="ID del tipo de empresa")
     estado_empresa_id: int = Field(..., gt=0, description="ID del estado de la empresa")
 
-    @validator('ruc')
+    @field_validator('ruc')
+    @classmethod
     def validar_ruc(cls, v):
         if not re.match(r'^[0-9-]+$', v):
             raise ValueError('El RUC debe contener solo números y guiones')
         return v
 
-    @validator('telefono')
+    @field_validator('telefono')
+    @classmethod
     def validar_telefono(cls, v):
         if v and not re.match(r'^[\+0-9\-\s\(\)]+$', v):
             raise ValueError('Formato de teléfono inválido')
@@ -182,13 +184,15 @@ class UsuarioBase(BaseModel):
     tipo_usuario_id: int = Field(..., gt=0, description="ID del tipo de usuario")
     estado_usuario_id: int = Field(..., gt=0, description="ID del estado del usuario")
 
-    @validator('username')
+    @field_validator('username')
+    @classmethod
     def validar_username(cls, v):
         if not re.match(r'^[a-zA-Z0-9_]+$', v):
             raise ValueError('El username solo puede contener letras, números y guiones bajos')
         return v
 
-    @validator('telefono')
+    @field_validator('telefono')
+    @classmethod
     def validar_telefono(cls, v):
         if v and not re.match(r'^[\+0-9\-\s\(\)]+$', v):
             raise ValueError('Formato de teléfono inválido')
@@ -197,7 +201,8 @@ class UsuarioBase(BaseModel):
 class UsuarioCreate(UsuarioBase):
     password: str = Field(..., min_length=8, max_length=128, description="Contraseña del usuario")
 
-    @validator('password')
+    @field_validator('password')
+    @classmethod
     def validar_password(cls, v):
         if len(v) < 8:
             raise ValueError('La contraseña debe tener al menos 8 caracteres')
@@ -242,13 +247,15 @@ class EmpleadoBase(BaseModel):
     empresa_id: int = Field(..., gt=0, description="ID de la empresa")
     estado_empleado_id: int = Field(..., gt=0, description="ID del estado del empleado")
 
-    @validator('documento_identidad')
+    @field_validator('documento_identidad')
+    @classmethod
     def validar_documento(cls, v):
         if not re.match(r'^[0-9A-Za-z\-]+$', v):
             raise ValueError('El documento debe contener solo números, letras y guiones')
         return v
 
-    @validator('codigo_empleado')
+    @field_validator('codigo_empleado')
+    @classmethod
     def validar_codigo_empleado(cls, v):
         if not re.match(r'^[A-Za-z0-9\-_]+$', v):
             raise ValueError('El código debe contener solo letras, números, guiones y guiones bajos')
@@ -291,20 +298,18 @@ class ProductoBase(BaseModel):
     tipo_producto_id: int = Field(..., gt=0, description="ID del tipo de producto")
     estado_producto_id: int = Field(..., gt=0, description="ID del estado del producto")
 
-    @validator('codigo')
+    @field_validator('codigo')
+    @classmethod
     def validar_codigo(cls, v):
         if not re.match(r'^[A-Za-z0-9\-_]+$', v):
             raise ValueError('El código debe contener solo letras, números, guiones y guiones bajos')
         return v
 
-    @root_validator
-    def validar_precios(cls, values):
-        precio_compra = values.get('precio_compra')
-        precio_venta = values.get('precio_venta')
-        
-        if precio_compra and precio_venta and precio_venta < precio_compra:
+    @model_validator(mode='after')
+    def validar_precios(self):
+        if self.precio_compra and self.precio_venta and self.precio_venta < self.precio_compra:
             raise ValueError('El precio de venta no puede ser menor al precio de compra')
-        return values
+        return self
 
 class ProductoCreate(ProductoBase):
     pass
@@ -331,6 +336,15 @@ class Producto(ProductoBase):
     class Config:
         from_attributes = True
 
+    @field_serializer('precio_compra', 'precio_venta')
+    def _serialize_decimals(self, v):
+        if v is None:
+            return v
+        try:
+            return float(v)
+        except Exception:
+            return v
+
 class InventarioBase(BaseModel):
     producto_id: int = Field(..., gt=0, description="ID del producto")
     cantidad_actual: int = Field(..., ge=0, description="Cantidad actual en stock")
@@ -342,19 +356,15 @@ class InventarioBase(BaseModel):
     fecha_ultima_entrada: Optional[datetime] = Field(None, description="Última fecha de entrada")
     fecha_ultima_salida: Optional[datetime] = Field(None, description="Última fecha de salida")
 
-    @root_validator
-    def validar_cantidades(cls, values):
-        cantidad_actual = values.get('cantidad_actual', 0)
-        cantidad_reservada = values.get('cantidad_reservada', 0)
-        cantidad_disponible = values.get('cantidad_disponible', 0)
-        
-        if cantidad_reservada > cantidad_actual:
+    @model_validator(mode='after')
+    def validar_cantidades(self):
+        if self.cantidad_reservada > self.cantidad_actual:
             raise ValueError('La cantidad reservada no puede ser mayor a la cantidad actual')
         
-        if cantidad_disponible != (cantidad_actual - cantidad_reservada):
-            values['cantidad_disponible'] = cantidad_actual - cantidad_reservada
+        if self.cantidad_disponible != (self.cantidad_actual - self.cantidad_reservada):
+            self.cantidad_disponible = self.cantidad_actual - self.cantidad_reservada
         
-        return values
+        return self
 
 class InventarioCreate(InventarioBase):
     pass
@@ -383,17 +393,13 @@ class DetalleVentaBase(BaseModel):
     descuento_unitario: Decimal = Field(0, ge=0, decimal_places=2, description="Descuento por unidad")
     subtotal: Decimal = Field(..., ge=0, decimal_places=2, description="Subtotal del detalle")
 
-    @root_validator
-    def validar_subtotal(cls, values):
-        cantidad = values.get('cantidad', 0)
-        precio_unitario = values.get('precio_unitario', 0)
-        descuento_unitario = values.get('descuento_unitario', 0)
+    @model_validator(mode='after')
+    def validar_subtotal(self):
+        if self.cantidad and self.precio_unitario:
+            subtotal_calculado = (self.precio_unitario - self.descuento_unitario) * self.cantidad
+            self.subtotal = subtotal_calculado
         
-        if cantidad and precio_unitario:
-            subtotal_calculado = (precio_unitario - descuento_unitario) * cantidad
-            values['subtotal'] = subtotal_calculado
-        
-        return values
+        return self
 
 class DetalleVentaCreate(DetalleVentaBase):
     pass
@@ -423,25 +429,22 @@ class VentaBase(BaseModel):
     estado_venta_id: int = Field(..., gt=0, description="ID del estado de la venta")
     observaciones: Optional[str] = Field(None, max_length=1000, description="Observaciones de la venta")
 
-    @validator('numero_venta')
+    @field_validator('numero_venta')
+    @classmethod
     def validar_numero_venta(cls, v):
         if not re.match(r'^[A-Za-z0-9\-_]+$', v):
             raise ValueError('El número de venta debe contener solo letras, números, guiones y guiones bajos')
         return v
 
-    @root_validator
-    def validar_total(cls, values):
-        subtotal = values.get('subtotal', 0)
-        impuesto = values.get('impuesto', 0)
-        descuento = values.get('descuento', 0)
-        
-        if subtotal:
-            total_calculado = subtotal + impuesto - descuento
+    @model_validator(mode='after')
+    def validar_total(self):
+        if self.subtotal:
+            total_calculado = self.subtotal + self.impuesto - self.descuento
             if total_calculado < 0:
                 raise ValueError('El total no puede ser negativo')
-            values['total'] = total_calculado
+            self.total = total_calculado
         
-        return values
+        return self
 
 class VentaCreate(VentaBase):
     detalle_ventas: List[DetalleVentaCreate] = Field(..., min_items=1, description="Detalles de la venta")

@@ -20,3 +20,12 @@ def pytest_configure(config):
     config.addinivalue_line(
         "markers", "unit: marca tests unitarios"
     )
+    config.addinivalue_line(
+        "markers", "auth: marca tests de autenticación"
+    )
+    config.addinivalue_line(
+        "markers", "database: marca tests de base de datos"
+    )
+    config.addinivalue_line(
+        "markers", "endpoints: marca tests de endpoints"
+    )

@@ -1,24 +1,46 @@
-# 📊 Documentación de Base de Datos - Sistema de Inventario
+# 📊 Base de Datos - Sistema de Inventario
 
-## 🏗️ Arquitectura General
+## Arquitectura General
 
-Este sistema de inventario utiliza **SQLAlchemy** como ORM y **Pydantic** para validación de datos, implementando un diseño relacional robusto con separación clara entre:
+Este sistema utiliza **SQLAlchemy** como ORM y **Pydantic v2** para validación de datos, implementando un diseño relacional robusto con separación clara entre:
 
 - **Tablas de Configuración**: Tipos y estados para clasificación
-- **Tablas Principales**: Entidades de negocio core
-- **Tablas de Transacciones**: Operaciones del sistema
+- **Tablas Principales**: Entidades de negocio core (Productos, Empresas, Usuarios, Ventas)
+- **Tablas de Transacciones**: Operaciones del sistema (Inventario, DetalleVenta)
+
+### Configuración de Base de Datos
+
+**Archivo**: `app/database/database.py`
+
+- Motor: SQLAlchemy con soporte para SQLite, PostgreSQL, MySQL
+- Sesión: `SessionLocal` con autocommit/autoflush deshabilitado
+- Dependency injection: `get_db()` para FastAPI
+- Creación automática de tablas en startup
+
+```python
+from app.database.database import engine, SessionLocal, get_db, create_tables
+
+# Crear todas las tablas
+create_tables()
+
+# Usar en endpoints
+@app.get("/ejemplo")
+def endpoint(db: Session = Depends(get_db)):
+    return db.query(Producto).all()
+```
 
 ---
 
-## 📋 Índice de Contenidos
+## Índice de Contenidos
 
-1. [Tablas de Configuración](#-tablas-de-configuración)
-2. [Tablas Principales](#-tablas-principales)
-3. [Relaciones](#-relaciones-entre-tablas)
-4. [Validaciones](#-validaciones-y-restricciones)
-5. [Índices y Rendimiento](#-índices-y-rendimiento)
-6. [Esquemas Pydantic](#-esquemas-pydantic)
-7. [Casos de Uso](#-casos-de-uso-típicos)
+1. [Tablas de Configuración](#tablas-de-configuración)
+2. [Tablas Principales](#tablas-principales)
+3. [Relaciones](#relaciones-entre-tablas)
+4. [Validaciones](#validaciones-y-restricciones)
+5. [Índices y Rendimiento](#índices-y-rendimiento)
+6. [Esquemas Pydantic](#esquemas-pydantic)
+7. [CRUD Genérico](#crud-genérico)
+8. [Casos de Uso](#casos-de-uso-típicos)
 
 ---
 
@@ -535,7 +557,79 @@ def validar_precios(cls, values):
 
 ---
 
-## 💼 Casos de Uso Típicos
+## CRUD Genérico
+
+### Descripción
+
+**Archivo**: `app/database/crud.py`
+
+`CRUDBase` provee operaciones CRUD reutilizables para cualquier modelo SQLAlchemy, reduciendo la duplicación de código.
+
+### Uso Básico
+
+```python
+from app.database.crud import CRUDBase
+from app.database.models import Producto
+from app.database import schemas
+
+# Instanciar CRUD para Producto
+crud_producto = CRUDBase[Producto, schemas.ProductoCreate, schemas.ProductoUpdate](Producto)
+
+# Crear
+nuevo = crud_producto.create(db, obj_in=schemas.ProductoCreate(...))
+
+# Obtener
+producto = crud_producto.get(db, id=1)
+
+# Actualizar
+producto_actualizado = crud_producto.update(db, db_obj=producto, obj_in={"nombre": "Nuevo Nombre"})
+
+# Eliminar
+crud_producto.delete(db, id=1)
+```
+
+### Métodos Disponibles
+
+| Método | Descripción |
+|--------|-------------|
+| `get(db, id)` | Obtiene registro por ID |
+| `get_or_404(db, id)` | Obtiene o lanza 404 si no existe |
+| `get_multi(db, skip=0, limit=100, filters=None, order_by=None)` | Lista con paginación y filtros |
+| `count(db, filters=None)` | Cuenta registros con filtros opcionales |
+| `create(db, obj_in)` | Crea nuevo registro |
+| `update(db, db_obj, obj_in)` | Actualiza registro existente |
+| `delete(db, id)` | Elimina registro por ID |
+| `get_by_field(db, field, value)` | Busca por campo específico |
+| `exists(db, id)` | Verifica existencia por ID |
+| `bulk_create(db, objs_in)` | Crea múltiples registros |
+| `bulk_delete(db, ids)` | Elimina múltiples registros |
+| `search(db, search_fields, search_term, skip=0, limit=100)` | Búsqueda por texto en múltiples campos |
+
+### Filtros y Búsqueda
+
+```python
+# Filtros simples
+productos = crud_producto.get_multi(db, filters={"estado_producto_id": 1})
+
+# Filtros avanzados
+productos = crud_producto.get_multi(db, filters={
+    "precio_venta": {"gte": 100, "lte": 500},
+    "nombre": {"like": "Laptop"}
+})
+
+# Búsqueda por texto en múltiples campos
+resultados = crud_producto.search(
+    db,
+    search_fields=["nombre", "codigo", "marca"],
+    search_term="Laptop",
+    skip=0,
+    limit=20
+)
+```
+
+---
+
+## Casos de Uso Típicos
 
 ### 1. Registro de Nueva Venta
 

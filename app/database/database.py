@@ -1,20 +1,17 @@
 from sqlalchemy import create_engine
 from sqlalchemy.orm import sessionmaker, Session
 from typing import Generator
-import os
-from dotenv import load_dotenv
 
-# Cargar variables de entorno
-load_dotenv()
+from app.core.settings import get_settings
 
-# Obtener URL de la base de datos desde el archivo .env
-DATABASE_URL = os.getenv("DATABASE_URL", "sqlite:///./inventario.db")
+settings = get_settings()
 
-# Crear el motor de la base de datos
+DATABASE_URL = settings.DATABASE_URL
+
 engine = create_engine(
     DATABASE_URL,
     connect_args={"check_same_thread": False} if "sqlite" in DATABASE_URL else {},
-    echo=os.getenv("DEBUG", "False").lower() == "true"
+    echo=bool(settings.DEBUG),
 )
 
 # Crear la sesión local

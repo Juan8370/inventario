@@ -15,13 +15,10 @@ Este sistema utiliza **SQLAlchemy** como ORM y **Pydantic v2** para validación 
 - Motor: SQLAlchemy con soporte para SQLite, PostgreSQL, MySQL
 - Sesión: `SessionLocal` con autocommit/autoflush deshabilitado
 - Dependency injection: `get_db()` para FastAPI
-- Creación automática de tablas en startup
+- Creación automática de tablas en startup (solo desarrollo/test; en producción usar migraciones)
 
 ```python
-from app.database.database import engine, SessionLocal, get_db, create_tables
-
-# Crear todas las tablas
-create_tables()
+from app.database.database import engine, SessionLocal, get_db
 
 # Usar en endpoints
 @app.get("/ejemplo")
@@ -786,4 +783,4 @@ Para más información sobre la implementación, consultar:
 
 ---
 
-*Documentación generada el 12 de Noviembre de 2025*
+*Documentación actualizada el 16 de Noviembre de 2025*

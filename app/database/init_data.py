@@ -1,11 +1,15 @@
 """
 Inicialización de datos por defecto para desarrollo
 """
+import logging
 from sqlalchemy.orm import Session
 from app.database.models import TipoUsuario, EstadoUsuario, Usuario
 from app.src.auth import crud_usuario
 from app.database.schemas import UsuarioCreate
-import os
+from app.core.settings import get_settings
+
+logger = logging.getLogger(__name__)
+settings = get_settings()
 
 
 def crear_tipos_usuario_default(db: Session):
@@ -48,14 +52,14 @@ def crear_estados_usuario_default(db: Session):
 
 def crear_usuario_admin_default(db: Session):
     """Crear usuario admin por defecto para desarrollo"""
-    # Solo crear en modo desarrollo
-    if os.getenv("ENVIRONMENT", "development") != "development":
+    # Solo crear en modo desarrollo y cuando la bandera lo permita
+    if settings.ENVIRONMENT != "development" or not settings.SEED_DEV_ADMIN:
         return
     
     # Verificar si ya existe el usuario admin
     admin_existente = crud_usuario.get_by_username(db, "admin")
     if admin_existente:
-        print("✓ Usuario admin ya existe")
+        logger.info("Usuario admin ya existe")
         return
     
     # Obtener tipo y estado de usuario
@@ -68,7 +72,7 @@ def crear_usuario_admin_default(db: Session):
     ).first()
     
     if not tipo_admin or not estado_activo:
-        print("✗ No se pudieron obtener tipo y estado de usuario")
+        logger.warning("No se pudieron obtener tipo y estado de usuario")
         return
     
     # Crear usuario admin
@@ -84,21 +88,17 @@ def crear_usuario_admin_default(db: Session):
     
     try:
         crud_usuario.create(db, obj_in=admin_data)
-        print("✓ Usuario admin creado exitosamente")
-        print("  Username: admin")
-        print("  Email: admin@ejemplo.com")
-        print("  Password: admin123")
-        print("  ⚠️  CAMBIAR CONTRASEÑA EN PRODUCCIÓN")
-    except Exception as e:
-        print(f"✗ Error creando usuario admin: {e}")
+        logger.info("Usuario admin creado exitosamente | Username=admin | Email=admin@ejemplo.com")
+    except Exception as e:  # noqa: BLE001
+        logger.exception("Error creando usuario admin: %s", e)
 
 
 def inicializar_datos_desarrollo(db: Session):
     """Inicializar todos los datos por defecto para desarrollo"""
-    print("\n🔄 Inicializando datos de desarrollo...")
-    
+    logger.info("Inicializando datos de desarrollo...")
+
     crear_tipos_usuario_default(db)
     crear_estados_usuario_default(db)
     crear_usuario_admin_default(db)
-    
-    print("✓ Inicialización de datos completada\n")
+
+    logger.info("Inicialización de datos completada")

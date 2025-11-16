@@ -1,12 +1,12 @@
 # ⚙️ Configuración - Variables de Entorno
 
-La aplicación se configura mediante variables de entorno cargadas con `python-dotenv`.
+La aplicación usa `pydantic-settings` (Pydantic v2) para cargar y validar configuración desde variables de entorno y archivo `.env` automáticamente mediante `app/core/settings.py`.
 
 ---
 
 ## Archivo .env
 
-Copia desde `.env.example` y ajusta valores según tu entorno.
+Copia desde `.env.example` y ajusta valores según tu entorno. `pydantic-settings` lo carga automáticamente, no necesitas llamar `load_dotenv()`.
 
 ### Ejemplo Completo
 
@@ -76,15 +76,16 @@ MAX_PAGE_SIZE=100
 - `staging` - Pruebas previas a producción
 - `production` - Producción
 
-### Servidor
+### Semilla de Desarrollo
 
 | Variable | Descripción | Valor por Defecto |
 |----------|-------------|-------------------|
-| `HOST` | Dirección IP del servidor | `0.0.0.0` |
-| `PORT` | Puerto del servidor | `8000` |
-| `RELOAD` | Auto-reload en cambios de código | `True` |
+| `SEED_DEV_ADMIN` | Crea usuario admin en dev si es `true` | `False` |
 
-**Nota**: `0.0.0.0` permite conexiones desde cualquier interfaz de red. Usa `127.0.0.1` para solo local.
+Notas:
+
+- Solo aplica si `ENVIRONMENT=development`.
+- Se omite si el usuario admin ya existe.
 
 ### Seguridad
 
@@ -105,6 +106,7 @@ python -c "import secrets; print(secrets.token_hex(32))"
 ```
 
 **IMPORTANTE**:
+
 - ⚠️ Nunca uses la `SECRET_KEY` de ejemplo en producción
 - ⚠️ Nunca subas el archivo `.env` a control de versiones
 - ✅ Añade `.env` a tu `.gitignore`
@@ -114,7 +116,7 @@ python -c "import secrets; print(secrets.token_hex(32))"
 
 | Variable | Descripción | Ejemplo |
 |----------|-------------|---------|
-| `ALLOWED_ORIGINS` | Orígenes permitidos para CORS (separados por comas) | `http://localhost:3000,https://app.ejemplo.com` |
+| `ALLOWED_ORIGINS` | Orígenes permitidos para CORS (separados por comas). Se normaliza a lista internamente. | `http://localhost:3000,https://app.ejemplo.com` |
 
 **Ejemplos de configuración:**
 
@@ -131,10 +133,7 @@ ALLOWED_ORIGINS=*
 
 ### Paginación
 
-| Variable | Descripción | Valor por Defecto |
-|----------|-------------|-------------------|
-| `DEFAULT_PAGE_SIZE` | Registros por página por defecto | `10` |
-| `MAX_PAGE_SIZE` | Máximo de registros por página | `100` |
+La paginación se maneja con parámetros `skip` y `limit` en los endpoints. Si se requiere centralizar valores por defecto/máximos, se pueden añadir al `Settings` en `app/core/settings.py`.
 
 ---
 
@@ -174,6 +173,7 @@ ACCESS_TOKEN_EXPIRE_MINUTES=60
 ```
 
 **Recomendaciones para producción:**
+
 1. ✅ Usa base de datos externa (PostgreSQL/MySQL)
 2. ✅ `DEBUG=False` para evitar exponer información sensible
 3. ✅ `RELOAD=False` para mejor rendimiento
@@ -185,77 +185,60 @@ ACCESS_TOKEN_EXPIRE_MINUTES=60
 
 ## Uso en la Aplicación
 
-### Cargar Variables
-
-**Archivo**: `run.py` o cualquier punto de entrada
+### Cargar Settings centralizado
 
 ```python
-from dotenv import load_dotenv
-import os
+from app.core.settings import get_settings
 
-# Cargar variables de .env
-load_dotenv()
-
-# Acceder a variables
-database_url = os.getenv("DATABASE_URL")
-secret_key = os.getenv("SECRET_KEY")
-debug = os.getenv("DEBUG", "False") == "True"
+settings = get_settings()
+print(settings.DATABASE_URL)
+print(settings.APP_NAME)
 ```
 
-### Configuración de FastAPI
+### Configuración de FastAPI y CORS
 
 ```python
 from fastapi import FastAPI
 from fastapi.middleware.cors import CORSMiddleware
-import os
+from app.core.settings import get_settings
+
+settings = get_settings()
 
 app = FastAPI(
-    title=os.getenv("APP_NAME", "Sistema de Inventario"),
-    version=os.getenv("APP_VERSION", "1.0.0"),
-    description=os.getenv("APP_DESCRIPTION", "API REST"),
-    debug=os.getenv("DEBUG", "False") == "True"
+    title=settings.APP_NAME,
+    version=settings.APP_VERSION,
+    description=settings.APP_DESCRIPTION,
+    debug=settings.DEBUG,
 )
 
-# CORS
-origins = os.getenv("ALLOWED_ORIGINS", "").split(",")
 app.add_middleware(
     CORSMiddleware,
-    allow_origins=origins,
+    allow_origins=[str(o) for o in settings.ALLOWED_ORIGINS],
     allow_credentials=True,
     allow_methods=["*"],
     allow_headers=["*"],
 )
 ```
 
-### Configuración de Base de Datos
+### Configuración de Base de Datos (referencia)
+
+`app/database/database.py` ya usa `settings`. Si necesitas crear un engine aparte:
 
 ```python
 from sqlalchemy import create_engine
-from sqlalchemy.orm import sessionmaker
-import os
+from app.core.settings import get_settings
 
-DATABASE_URL = os.getenv("DATABASE_URL", "sqlite:///./inventario.db")
-
+settings = get_settings()
 engine = create_engine(
-    DATABASE_URL,
-    connect_args={"check_same_thread": False} if "sqlite" in DATABASE_URL else {}
+    settings.DATABASE_URL,
+    connect_args={"check_same_thread": False} if "sqlite" in settings.DATABASE_URL else {},
+    echo=settings.DEBUG,
 )
-
-SessionLocal = sessionmaker(autocommit=False, autoflush=False, bind=engine)
 ```
 
-### Configuración de Autenticación
+### Configuración de Autenticación (referencia)
 
-```python
-import os
-
-SECRET_KEY = os.getenv("SECRET_KEY")
-ALGORITHM = os.getenv("ALGORITHM", "HS256")
-ACCESS_TOKEN_EXPIRE_MINUTES = int(os.getenv("ACCESS_TOKEN_EXPIRE_MINUTES", "1440"))
-
-if not SECRET_KEY:
-    raise ValueError("SECRET_KEY no configurada en .env")
-```
+Las dependencias de `app/src/auth/dependencies.py` obtienen `SECRET_KEY`, `ALGORITHM` y `ACCESS_TOKEN_EXPIRE_MINUTES` desde `settings`; no es necesario leer `.env` manualmente.
 
 ---
 
@@ -266,6 +249,7 @@ if not SECRET_KEY:
 **Causa**: No se encontró la variable `SECRET_KEY` en el archivo `.env`.
 
 **Solución**:
+
 1. Verifica que existe el archivo `.env` en la raíz del proyecto
 2. Genera una clave secreta: `openssl rand -hex 32`
 3. Añade `SECRET_KEY=tu_clave_generada` al archivo `.env`
@@ -275,6 +259,7 @@ if not SECRET_KEY:
 **Causa**: `DATABASE_URL` incorrecta o base de datos no accesible.
 
 **Solución**:
+
 1. Verifica que `DATABASE_URL` tenga el formato correcto
 2. Para PostgreSQL/MySQL: verifica credenciales y que el servidor esté corriendo
 3. Para SQLite: verifica permisos de escritura en el directorio
@@ -284,6 +269,7 @@ if not SECRET_KEY:
 **Causa**: El origen del frontend no está en `ALLOWED_ORIGINS`.
 
 **Solución**:
+
 1. Añade el origen del frontend a `ALLOWED_ORIGINS`
 2. Ejemplo: `ALLOWED_ORIGINS=http://localhost:3000`
 3. Reinicia el servidor después de cambiar `.env`
@@ -293,6 +279,7 @@ if not SECRET_KEY:
 **Causa**: Archivo `.env` no se carga correctamente.
 
 **Solución**:
+
 1. Verifica que `python-dotenv` esté instalado: `pip install python-dotenv`
 2. Asegúrate de llamar `load_dotenv()` antes de acceder a variables
 3. Verifica la ubicación del archivo `.env` (debe estar en la raíz)
@@ -301,9 +288,10 @@ if not SECRET_KEY:
 
 ## Buenas Prácticas
 
-### Seguridad
+### Seguridad (buenas prácticas)
 
 ✅ **HACER:**
+
 - Usar variables de entorno para datos sensibles
 - Generar claves aleatorias únicas por entorno
 - Añadir `.env` al `.gitignore`
@@ -311,6 +299,7 @@ if not SECRET_KEY:
 - Usar HTTPS en producción
 
 ❌ **NO HACER:**
+
 - Subir `.env` a Git/GitHub
 - Usar la misma `SECRET_KEY` en todos los entornos
 - Poner credenciales directamente en el código
@@ -320,12 +309,14 @@ if not SECRET_KEY:
 ### Gestión de Configuración
 
 ✅ **HACER:**
+
 - Crear archivo `.env.example` con valores de ejemplo (sin datos sensibles)
 - Documentar cada variable en el README
 - Usar valores por defecto razonables cuando sea posible
 - Validar variables críticas al inicio de la aplicación
 
 ❌ **NO HACER:**
+
 - Asumir que las variables siempre existen
 - Usar valores por defecto inseguros
 - Ignorar errores de configuración
@@ -355,13 +346,4 @@ ALLOWED_ORIGINS=http://localhost:3000
 
 ## Dependencias Requeridas
 
-Para usar variables de entorno:
-
-```bash
-pip install python-dotenv
-```
-
-Ya incluido en `requirements.txt`:
-```txt
-python-dotenv>=1.0.0
-```
+`pydantic-settings` ya está incluido en `requirements.txt` y se usa como mecanismo principal de configuración.

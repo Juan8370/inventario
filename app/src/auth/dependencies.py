@@ -6,12 +6,14 @@ from sqlalchemy.orm import Session
 from app.database.database import get_db
 from app.src.auth.service import AuthService
 from app.database.models import Usuario
-import os
+from app.core.settings import get_settings
+
+settings = get_settings()
 
 # Configuración global
-SECRET_KEY = os.getenv("SECRET_KEY", "change_this_secret_key_in_production")
-ALGORITHM = os.getenv("ALGORITHM", "HS256")
-ACCESS_TOKEN_EXPIRE_MINUTES = int(os.getenv("ACCESS_TOKEN_EXPIRE_MINUTES", "1440"))
+SECRET_KEY = settings.SECRET_KEY
+ALGORITHM = settings.ALGORITHM
+ACCESS_TOKEN_EXPIRE_MINUTES = int(settings.ACCESS_TOKEN_EXPIRE_MINUTES)
 
 # Instancia global del servicio de autenticación
 auth_service = AuthService(

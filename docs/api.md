@@ -11,7 +11,7 @@ Todos los endpoints devuelven códigos de estado HTTP correctos (200/201/400/401
 ## Índice de Contenidos
 
 1. [Autenticación](#autenticación)
-2. [Endpoints Públicos](#endpoints-públicos)
+2. [System](#system)
 3. [Endpoints de Productos](#endpoints-de-productos)
 4. [Endpoints de Empresas](#endpoints-de-empresas)
 5. [Protección de Endpoints](#protección-de-endpoints)
@@ -163,9 +163,9 @@ El token contiene:
 
 ---
 
-## Endpoints Públicos
+## System
 
-### Bienvenida
+### Bienvenida (público)
 
 **GET** `/`
 
@@ -180,7 +180,7 @@ Retorna información general de la API.
 }
 ```
 
-### Health Check
+### Health Check (público)
 
 **GET** `/health`
 
@@ -203,7 +203,7 @@ Verifica estado de la aplicación y conexión a base de datos.
 }
 ```
 
-### Información de Base de Datos
+### Información de Base de Datos (solo administradores)
 
 **GET** `/db/info`
 
@@ -218,18 +218,20 @@ Retorna información sobre la base de datos (sin credenciales).
 }
 ```
 
-### Estadísticas Generales
+### Estadísticas Generales (requiere autenticación)
 
 **GET** `/stats`
 
-Retorna estadísticas del sistema.
+Retorna estadísticas del sistema. Requiere encabezado `Authorization: Bearer <token>`.
 
 **Response (200 OK):**
 ```json
 {
   "total_productos": 150,
   "total_empresas": 25,
-  "total_usuarios": 10
+  "total_usuarios": 10,
+  "database_connected": true,
+  "usuario_actual": "usuario"
 }
 ```
 
@@ -727,8 +729,8 @@ def change_password(
 
 ### Creación de Tablas
 
-- Tablas se crean automáticamente en `startup`
-- No requiere migración manual inicial
+- En desarrollo/test, las tablas se crean automáticamente al iniciar.
+- En producción, no se crean automáticamente; se recomienda usar migraciones (Alembic).
 
 ### Paginación
 

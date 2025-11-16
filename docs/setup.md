@@ -113,7 +113,7 @@ pip install -r requirements-dev.txt
 
 ### 1. Variables de Entorno
 
-Crea un archivo `.env` en la raíz del proyecto:
+Configura variables con un archivo `.env` en la raíz del proyecto. Usa la plantilla de ejemplo:
 
 ```powershell
 # Copiar archivo de ejemplo
@@ -128,6 +128,7 @@ DATABASE_URL=sqlite:///./inventario.db
 
 # Aplicación
 APP_NAME=Sistema de Inventario
+APP_DESCRIPTION=API para gestión de inventario
 APP_VERSION=1.0.0
 DEBUG=True
 ENVIRONMENT=development
@@ -137,8 +138,11 @@ SECRET_KEY=genera_una_clave_aleatoria_aqui
 ALGORITHM=HS256
 ACCESS_TOKEN_EXPIRE_MINUTES=1440
 
-# CORS
+# CORS (lista separada por comas)
 ALLOWED_ORIGINS=http://localhost:3000,http://localhost:8080
+
+# Semilla de datos (solo en dev)
+SEED_DEV_ADMIN=true
 ```
 
 **Generar SECRET_KEY segura:**
@@ -153,19 +157,25 @@ openssl rand -hex 32
 
 Ver `config.md` para más detalles sobre configuración.
 
+Notas importantes:
+
+- En producción, la app no crea tablas automáticamente (usa migraciones/Alembic).
+- La semilla del usuario admin solo corre si `ENVIRONMENT=development` y `SEED_DEV_ADMIN=true`.
+- El logging es legible en dev y JSON en producción.
+
 ### 2. Base de Datos
 
-**SQLite (por defecto)**
+#### SQLite (por defecto)
 
 No requiere configuración adicional. El archivo `inventario.db` se creará automáticamente al iniciar la aplicación.
 
-**PostgreSQL (producción recomendada)**
+#### PostgreSQL (producción recomendada)
 
 ```env
 DATABASE_URL=postgresql://usuario:password@localhost:5432/inventario
 ```
 
-**MySQL**
+#### MySQL
 
 ```env
 DATABASE_URL=mysql+pymysql://usuario:password@localhost:3306/inventario
@@ -193,33 +203,21 @@ uvicorn app.main:app --reload --host 0.0.0.0 --port 8000
 
 Una vez iniciada, la aplicación estará disponible en:
 
-- **API Base**: http://localhost:8000/
-- **Documentación Interactiva (Swagger)**: http://localhost:8000/docs
-- **Documentación Alternativa (ReDoc)**: http://localhost:8000/redoc
+- **API Base**: <http://localhost:8000/>
+- **Documentación Interactiva (Swagger)**: <http://localhost:8000/docs>
+- **Documentación Alternativa (ReDoc)**: <http://localhost:8000/redoc>
 
-### Usuario Admin por Defecto
+### Usuario Admin por Defecto (solo desarrollo)
 
-En modo desarrollo, se crea automáticamente un usuario administrador para facilitar las pruebas:
+Si configuras `ENVIRONMENT=development` y `SEED_DEV_ADMIN=true`, se intentará crear un usuario admin inicial:
 
-**Credenciales de Admin:**
-- **Username**: `admin`
-- **Email**: `admin@ejemplo.com`
-- **Password**: `admin123`
+**Credenciales por defecto (cámbialas luego):**
 
-Verás este mensaje en consola al iniciar:
-```
-✓ Base de datos inicializada correctamente
+- Username: `admin`
+- Email: `admin@ejemplo.com`
+- Password: `admin123`
 
-🔄 Inicializando datos de desarrollo...
-✓ Usuario admin creado exitosamente
-  Username: admin
-  Email: admin@ejemplo.com
-  Password: admin123
-  ⚠️  CAMBIAR CONTRASEÑA EN PRODUCCIÓN
-✓ Inicialización de datos completada
-```
-
-**Nota**: Este usuario solo se crea si `ENVIRONMENT=development` en tu `.env` y si no existe ya.
+La creación se omite si el usuario ya existe o si faltan tipos/estados base.
 
 ### Verificar Estado
 

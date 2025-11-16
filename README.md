@@ -1,101 +1,111 @@
 # 📦 Sistema de Inventario
 
-Un sistema completo de gestión de inventario desarrollado con FastAPI, SQLAlchemy y Pydantic.
+Sistema de gestión de inventario con FastAPI, SQLAlchemy y Pydantic. Se aplicó la Fase 1 de mejoras: configuración centralizada, logging unificado, manejo global de errores y routers modularizados.
 
 ## 🚀 Características
 
-- ✅ **Gestión de Usuarios** - Sistema completo de autenticación y autorización
-- ✅ **Catálogo de Productos** - Control completo de productos con tipos y estados
-- ✅ **Control de Inventario** - Seguimiento en tiempo real de stock y ubicaciones
-- ✅ **Sistema de Ventas** - Registro de ventas con detalles completos
-- ✅ **Gestión de Empresas** - Administración de empresas y empleados
-- ✅ **Validaciones Robustas** - Tipado fuerte con Pydantic
-- ✅ **Tests Completos** - Cobertura completa de funcionalidades
+- ✅ Autenticación JWT y autorización por rol (admin/usuario)
+- ✅ Productos, Empresas y Usuarios con CRUD y validaciones
+- ✅ Configuración centralizada con `pydantic-settings`
+- ✅ Logging por entorno (legible en dev, JSON en prod)
+- ✅ Handlers globales de errores (`HTTPException`, validación)
+- ✅ Routers modularizados: `system`, `auth`, `productos`, `empresas`, `usuarios`, `stats`
+- ✅ Suite de tests (61) pasando tras refactor
 
-## 🏗️ Arquitectura
+## 🏗️ Arquitectura (resumen)
 
 ```
 inventario/
 ├── app/
+│   ├── core/
+│   │   ├── settings.py            # Configuración centralizada (pydantic-settings)
+│   │   ├── logging.py             # Configuración de logging
+│   │   └── exception_handlers.py  # Manejo global de errores
+│   ├── routers/
+│   │   ├── system.py   # /, /health, /db/info
+│   │   ├── auth.py     # /auth/*
+│   │   ├── productos.py
+│   │   ├── empresas.py
+│   │   ├── usuarios.py
+│   │   └── stats.py    # /stats
 │   ├── database/
-│   │   ├── models.py      # Modelos SQLAlchemy
-│   │   └── schemas.py     # Esquemas Pydantic
-│   ├── src/              # Lógica de aplicación
-│   └── main.py           # Punto de entrada
+│   │   ├── database.py
+│   │   ├── models.py
+│   │   ├── schemas.py
+│   │   ├── crud.py
+│   │   └── init_data.py
+│   ├── src/
+│   │   └── auth/       # jwt, password, crud, service, dependencies
+│   └── main.py
 ├── docs/
-│   └── database.md       # Documentación completa
+│   ├── setup.md
+│   ├── api.md
+│   ├── config.md
+│   ├── database.md
+│   └── recomendaciones.md
 ├── test/
-│   └── test_database.py  # Tests de base de datos
-└── requirements.txt      # Dependencias
+│   ├── test_api_endpoints.py
+│   ├── test_auth.py
+│   └── test_database.py
+├── .env.example
+├── run.py
+└── requirements.txt
 ```
 
-## 🔧 Instalación
+## 🔧 Puesta en marcha rápida
 
-1. **Clonar el repositorio**
-```bash
+### Clonar el repositorio
+
+```powershell
 git clone <repository-url>
 cd inventario
 ```
 
-2. **Crear entorno virtual**
-```bash
-python -m venv .venv
-.venv\Scripts\activate  # Windows
-# source .venv/bin/activate  # Linux/Mac
+### Crear entorno virtual
+
+```powershell
+py -m venv .venv
+.\.venv\Scripts\Activate.ps1
 ```
 
-3. **Instalar dependencias**
-```bash
+### Instalar dependencias y arrancar
+
+```powershell
 pip install -r requirements.txt
-# Para desarrollo: pip install -r requirements-dev.txt
+# Desarrollo: pip install -r requirements-dev.txt
+Copy-Item .env.example .env
+py run.py
 ```
 
-4. **Ejecutar tests**
-```bash
-pytest test/ -v
-```
+API: <http://localhost:8000> • Docs: <http://localhost:8000/docs>
 
-## 🗄️ Base de Datos
+ 
 
-El sistema utiliza SQLAlchemy con soporte para múltiples bases de datos:
-- SQLite (desarrollo)
-- PostgreSQL (producción recomendada)
-- MySQL (alternativa)
+## 🗄️ Base de datos (resumen)
 
-### Tablas Principales:
-- `usuarios` - Gestión de usuarios del sistema
-- `empresas` - Información de empresas
-- `empleados` - Gestión de recursos humanos  
-- `productos` - Catálogo de productos
-- `inventario` - Control de stock
-- `ventas` - Registro de transacciones
-- `detalle_ventas` - Detalles de cada venta
+- Desarrollo/Test: crea tablas automáticamente al iniciar.
+- Producción: no auto-crea tablas; se recomienda usar migraciones (Alembic).
+- Soporte: SQLite, PostgreSQL, MySQL.
 
-Para más detalles, consultar [documentación de base de datos](docs/database.md).
+Detalles en `docs/database.md`.
 
-## 🧪 Testing
+## 🧪 Tests
 
-```bash
-# Ejecutar todos los tests
-pytest
+- Estado actual: 61 tests pasando tras la refactorización de Fase 1.
 
-# Tests con cobertura
-pytest --cov=app
-
-# Tests específicos
-pytest test/test_database.py -v
+```powershell
+pytest -q
 ```
 
 ## 📚 Documentación
 
-- [Setup](docs/setup.md) - Puesta en marcha y ejecución
-- [Entorno](docs/env.md) - Variables de entorno (.env)
-- [API](docs/api.md) - Endpoints, códigos y payloads
-- [CRUD Genérico](docs/crud.md) - Uso de `CRUDBase`
-- [Testing](docs/testing.md) - Cómo ejecutar y qué cubren los tests
-- [Arquitectura](docs/architecture.md) - Estructura y flujo de la app
-- [Base de Datos](docs/database.md) - Esquema y relaciones
-- API interactiva - Disponible en `/docs` cuando el servidor está corriendo
+- `docs/setup.md` - Instalación y ejecución
+- `docs/config.md` - Configuración y variables de entorno
+- `docs/api.md` - Endpoints y auth
+- `docs/database.md` - Esquema y relaciones
+- `docs/recomendaciones.md` - Roadmap y mejoras
+
+API interactiva: `/docs` (Swagger) y `/redoc`.
 
 ## 🤝 Contribuciones
 

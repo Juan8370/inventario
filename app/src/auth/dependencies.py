@@ -3,10 +3,10 @@ from typing import Optional, Callable
 from fastapi import Depends, HTTPException, status
 from fastapi.security import HTTPBearer, HTTPAuthorizationCredentials
 from sqlalchemy.orm import Session
-from app.database.database import get_db
+from app.src.database.database import get_db
 from app.src.auth.service import AuthService
-from app.database.models import Usuario
-from app.core.settings import get_settings
+from app.src.database.models import Usuario
+from app.src.core.settings import get_settings
 
 settings = get_settings()
 

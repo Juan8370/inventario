@@ -11,8 +11,8 @@ import os
 sys.path.append(os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
 
 from app.main import app
-from app.database.database import get_db
-from app.database.models import Base, Usuario, TipoUsuario, EstadoUsuario
+from app.src.database.database import get_db
+from app.src.database.models import Base, Usuario, TipoUsuario, EstadoUsuario
 from app.src.auth import (
     PasswordHandler, 
     JWTHandler, 
@@ -93,7 +93,7 @@ def setup_test_user(clean_auth_database):
         db.refresh(estado_usuario)
         
         # Crear usuario con contraseña hasheada
-        from app.database.schemas import UsuarioCreate
+        from app.src.database.schemas import UsuarioCreate
         usuario_data = UsuarioCreate(
             username="testuser",
             email="test@example.com",
@@ -258,7 +258,7 @@ class TestCRUDUsuario:
             db.refresh(estado)
             
             # Crear usuario
-            from app.database.schemas import UsuarioCreate
+            from app.src.database.schemas import UsuarioCreate
             usuario_data = UsuarioCreate(
                 username="newuser",
                 email="new@example.com",
@@ -482,7 +482,7 @@ class TestAuthService:
             db.refresh(tipo)
             db.refresh(estado)
             
-            from app.database.schemas import UsuarioCreate
+            from app.src.database.schemas import UsuarioCreate
             usuario_data = UsuarioCreate(
                 username="inactive",
                 email="inactive@example.com",

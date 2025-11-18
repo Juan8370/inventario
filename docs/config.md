@@ -222,7 +222,7 @@ app.add_middleware(
 
 ### Configuración de Base de Datos (referencia)
 
-`app/database/database.py` ya usa `settings`. Si necesitas crear un engine aparte:
+`app/src/database/database.py` ya usa `settings`. Si necesitas crear un engine aparte:
 
 ```python
 from sqlalchemy import create_engine

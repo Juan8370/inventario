@@ -102,6 +102,18 @@ class EstadoEmpleado(Base):
     # Relación
     empleados = relationship("Empleado", back_populates="estado_empleado")
 
+class TipoLog(Base):
+    __tablename__ = "tipos_log"
+    
+    id = Column(Integer, primary_key=True, index=True)
+    nombre = Column(String(50), unique=True, nullable=False)
+    descripcion = Column(Text)
+    activo = Column(Boolean, default=True)
+    fecha_creacion = Column(DateTime, default=datetime.utcnow)
+    
+    # Relación
+    logs = relationship("Log", back_populates="tipo_log")
+
 # Tablas principales
 
 class Empresa(Base):
@@ -147,6 +159,7 @@ class Usuario(Base):
     tipo_usuario = relationship("TipoUsuario", back_populates="usuarios")
     estado_usuario = relationship("EstadoUsuario", back_populates="usuarios")
     ventas = relationship("Venta", back_populates="usuario")
+    logs = relationship("Log", back_populates="usuario")
 
 class Empleado(Base):
     __tablename__ = "empleados"
@@ -255,3 +268,22 @@ class DetalleVenta(Base):
     # Relaciones
     venta = relationship("Venta", back_populates="detalle_ventas")
     producto = relationship("Producto", back_populates="detalle_ventas")
+
+class Log(Base):
+    """
+    Tabla de logs del sistema - INMUTABLE
+    Registra todas las acciones realizadas en el sistema
+    Los registros NO pueden ser modificados ni eliminados una vez creados
+    """
+    __tablename__ = "logs"
+    
+    id = Column(Integer, primary_key=True, index=True)
+    descripcion = Column(Text, nullable=False)
+    usuario_tipo = Column(String(20), nullable=False)  # SYSTEM o USUARIO
+    tipo_log_id = Column(Integer, ForeignKey("tipos_log.id"), nullable=False)
+    usuario_id = Column(Integer, ForeignKey("usuarios.id"), nullable=True)  # NULL para logs de SYSTEM
+    fecha = Column(DateTime, default=datetime.utcnow, nullable=False, index=True)
+    
+    # Relaciones
+    tipo_log = relationship("TipoLog", back_populates="logs")
+    usuario = relationship("Usuario", back_populates="logs")

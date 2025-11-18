@@ -12,8 +12,8 @@ import os
 sys.path.append(os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
 
 from app.main import app
-from app.database.database import get_db
-from app.database.models import Base
+from app.src.database.database import get_db
+from app.src.database.models import Base
 
 
 # Configurar base de datos de prueba en memoria
@@ -78,7 +78,7 @@ def setup_test_users(setup_database, clean_database):
     """Crear usuarios de prueba para autenticación"""
     db = TestingSessionLocal()
     try:
-        from app.database.models import Usuario, EstadoUsuario, TipoUsuario
+        from app.src.database.models import Usuario, EstadoUsuario, TipoUsuario
         from app.src.auth.password import PasswordHandler
         
         password_handler = PasswordHandler()
@@ -308,7 +308,7 @@ class TestProductosEndpoints:
         """Crear datos necesarios para productos"""
         db = TestingSessionLocal()
         try:
-            from app.database.models import TipoProducto, EstadoProducto
+            from app.src.database.models import TipoProducto, EstadoProducto
             
             tipo = TipoProducto(nombre="Electrónicos", descripcion="Productos electrónicos")
             db.add(tipo)
@@ -450,7 +450,7 @@ class TestEmpresasEndpoints:
         """Crear datos necesarios para empresas"""
         db = TestingSessionLocal()
         try:
-            from app.database.models import TipoEmpresa, EstadoEmpresa
+            from app.src.database.models import TipoEmpresa, EstadoEmpresa
             
             tipo = TipoEmpresa(nombre="Cliente", descripcion="Empresa cliente")
             db.add(tipo)
@@ -549,7 +549,7 @@ class TestIntegracionCompleta:
         """Verificar flujo completo de autenticación y operaciones con productos"""
         db = TestingSessionLocal()
         try:
-            from app.database.models import TipoProducto, EstadoProducto
+            from app.src.database.models import TipoProducto, EstadoProducto
             
             # Preparar datos
             tipo = TipoProducto(nombre="Test", descripcion="Test tipo")

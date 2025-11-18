@@ -469,6 +469,65 @@ class Venta(VentaBase):
     class Config:
         from_attributes = True
 
+class TipoLogBase(BaseModel):
+    nombre: str = Field(..., min_length=1, max_length=50, description="Nombre del tipo de log")
+    descripcion: Optional[str] = Field(None, max_length=500, description="Descripción del tipo de log")
+    activo: bool = Field(True, description="Estado activo del tipo")
+
+class TipoLogCreate(TipoLogBase):
+    pass
+
+class TipoLog(TipoLogBase):
+    id: int
+    fecha_creacion: datetime
+
+    class Config:
+        from_attributes = True
+
+class LogBase(BaseModel):
+    """
+    Esquema base para logs del sistema
+    Los logs son INMUTABLES - no se pueden modificar ni eliminar
+    """
+    descripcion: str = Field(..., min_length=1, description="Descripción de la acción realizada")
+    usuario_tipo: str = Field(..., pattern="^(SYSTEM|USUARIO)$", description="Tipo de usuario: SYSTEM o USUARIO")
+    tipo_log_id: int = Field(..., gt=0, description="ID del tipo de log")
+    usuario_id: Optional[int] = Field(None, gt=0, description="ID del usuario (NULL para logs de SYSTEM)")
+
+    @model_validator(mode='after')
+    def validar_usuario_tipo(self):
+        """Validar que SYSTEM no tenga usuario_id y USUARIO sí lo tenga"""
+        if self.usuario_tipo == "SYSTEM" and self.usuario_id is not None:
+            raise ValueError('Los logs de tipo SYSTEM no deben tener usuario_id')
+        if self.usuario_tipo == "USUARIO" and self.usuario_id is None:
+            raise ValueError('Los logs de tipo USUARIO deben tener usuario_id')
+        return self
+
+class LogCreate(LogBase):
+    """Schema para crear logs - NO hay update ni delete"""
+    pass
+
+class Log(LogBase):
+    """
+    Esquema de respuesta para logs
+    Los logs NO pueden ser modificados - son inmutables
+    """
+    id: int
+    fecha: datetime
+    tipo_log: Optional[TipoLog] = None
+    usuario: Optional[Usuario] = None
+
+    class Config:
+        from_attributes = True
+
+class LogListResponse(BaseModel):
+    """Respuesta paginada para logs"""
+    items: List[Log]
+    total: int
+    page: int
+    size: int
+    pages: int
+
 # Esquemas de respuesta para listas
 class ListResponse(BaseModel):
     items: List[BaseModel]

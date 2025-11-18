@@ -4,9 +4,9 @@ from fastapi import APIRouter, Depends, HTTPException
 from sqlalchemy import text
 from sqlalchemy.orm import Session
 
-from app.core.settings import get_settings
-from app.database.database import get_db
-from app.database.models import Base, Usuario
+from app.src.core.settings import get_settings
+from app.src.database.database import get_db
+from app.src.database.models import Base, Usuario
 from app.src.auth import get_current_admin
 
 

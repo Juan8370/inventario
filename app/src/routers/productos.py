@@ -1,11 +1,12 @@
 from fastapi import APIRouter, Depends, HTTPException, Query
 from sqlalchemy.orm import Session
 
-from app.database.database import get_db
-from app.database.crud import CRUDBase
-from app.database.models import Producto, Usuario
-from app.database import schemas
+from app.src.database.database import get_db
+from app.src.database.crud import CRUDBase
+from app.src.database.models import Producto, Usuario
+from app.src.database import schemas
 from app.src.auth import get_current_user, get_optional_user, get_current_admin
+from app.src.database.log_helper import log_info, log_error
 
 
 router = APIRouter(prefix="/productos", tags=["productos"])
@@ -42,7 +43,21 @@ async def crear_producto(
     producto_existente = crud_producto.get_by_field(db, "codigo", producto.codigo)
     if producto_existente:
         raise HTTPException(status_code=400, detail="Ya existe un producto con este código")
-    return crud_producto.create(db, obj_in=producto)
+    
+    nuevo_producto = crud_producto.create(db, obj_in=producto)
+    
+    # Registrar creación de producto
+    try:
+        log_info(
+            db,
+            f"Producto creado: {nuevo_producto.nombre} (código: {nuevo_producto.codigo})",
+            usuario_id=current_user.id,
+            usuario_tipo="USUARIO"
+        )
+    except Exception:
+        pass  # No fallar la creación por error en logging
+    
+    return nuevo_producto
 
 
 @router.put("/{producto_id}", response_model=schemas.Producto, status_code=200)
@@ -53,7 +68,20 @@ async def actualizar_producto(
     current_user: Usuario = Depends(get_current_user),
 ):
     db_producto = crud_producto.get_or_404(db, producto_id)
-    return crud_producto.update(db, db_obj=db_producto, obj_in=producto)
+    producto_actualizado = crud_producto.update(db, db_obj=db_producto, obj_in=producto)
+    
+    # Registrar actualización
+    try:
+        log_info(
+            db,
+            f"Producto actualizado: {producto_actualizado.nombre} (ID: {producto_id})",
+            usuario_id=current_user.id,
+            usuario_tipo="USUARIO"
+        )
+    except Exception:
+        pass
+    
+    return producto_actualizado
 
 
 @router.delete("/{producto_id}", status_code=200)
@@ -63,6 +91,18 @@ async def eliminar_producto(
     current_user: Usuario = Depends(get_current_admin),
 ):
     producto = crud_producto.delete(db, id=producto_id)
+    
+    # Registrar eliminación
+    try:
+        log_info(
+            db,
+            f"Producto eliminado: {producto.nombre} (código: {producto.codigo})",
+            usuario_id=current_user.id,
+            usuario_tipo="USUARIO"
+        )
+    except Exception:
+        pass
+    
     return {"message": f"Producto {producto.nombre} eliminado correctamente"}
 
 

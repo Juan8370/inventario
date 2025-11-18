@@ -1,9 +1,9 @@
 from fastapi import APIRouter, Depends
 from sqlalchemy.orm import Session
 
-from app.database.database import get_db
-from app.database import schemas
-from app.database.models import Usuario
+from app.src.database.database import get_db
+from app.src.database import schemas
+from app.src.database.models import Usuario
 from app.src.auth import (
     auth_service,
     LoginRequest,
@@ -11,6 +11,7 @@ from app.src.auth import (
     ChangePasswordRequest,
     crud_usuario as auth_crud_usuario,
 )
+from app.src.database.log_helper import log_info
 
 
 router = APIRouter(prefix="/auth", tags=["auth"])
@@ -43,5 +44,16 @@ async def change_password(
         from fastapi import HTTPException
 
         raise HTTPException(status_code=400, detail="Contraseña actual incorrecta")
+
+    # Registrar cambio de contraseña
+    try:
+        log_info(
+            db,
+            f"Contraseña actualizada por usuario: {current_user.username}",
+            usuario_id=current_user.id,
+            usuario_tipo="USUARIO"
+        )
+    except Exception:
+        pass
 
     return {"message": "Contraseña actualizada exitosamente"}

@@ -6,37 +6,41 @@ Sistema de gestión de inventario con FastAPI, SQLAlchemy y Pydantic. Se aplicó
 
 - ✅ Autenticación JWT y autorización por rol (admin/usuario)
 - ✅ Productos, Empresas y Usuarios con CRUD y validaciones
+- ✅ **Sistema de Logs inmutables** con auditoría completa y trazabilidad
 - ✅ Configuración centralizada con `pydantic-settings`
 - ✅ Logging por entorno (legible en dev, JSON en prod)
 - ✅ Handlers globales de errores (`HTTPException`, validación)
-- ✅ Routers modularizados: `system`, `auth`, `productos`, `empresas`, `usuarios`, `stats`
-- ✅ Suite de tests (61) pasando tras refactor
+- ✅ Routers modularizados: `system`, `auth`, `productos`, `empresas`, `usuarios`, `stats`, `logs`
+- ✅ Suite de tests (91) pasando - incluye 26 tests automatizados para logs
 
 ## 🏗️ Arquitectura (resumen)
 
 ```
 inventario/
 ├── app/
-│   ├── core/
-│   │   ├── settings.py            # Configuración centralizada (pydantic-settings)
-│   │   ├── logging.py             # Configuración de logging
-│   │   └── exception_handlers.py  # Manejo global de errores
-│   ├── routers/
-│   │   ├── system.py   # /, /health, /db/info
-│   │   ├── auth.py     # /auth/*
-│   │   ├── productos.py
-│   │   ├── empresas.py
-│   │   ├── usuarios.py
-│   │   └── stats.py    # /stats
-│   ├── database/
-│   │   ├── database.py
-│   │   ├── models.py
-│   │   ├── schemas.py
-│   │   ├── crud.py
-│   │   └── init_data.py
 │   ├── src/
-│   │   └── auth/       # jwt, password, crud, service, dependencies
-│   └── main.py
+│       ├── core/
+│       │   ├── settings.py            # Configuración centralizada (pydantic-settings)
+│       │   ├── logging.py             # Configuración de logging
+│       │   └── exception_handlers.py  # Manejo global de errores
+│       ├── routers/
+│       │   ├── system.py   # /, /health, /db/info
+│       │   ├── auth.py     # /auth/*
+│       │   ├── productos.py
+│       │   ├── empresas.py
+│       │   ├── usuarios.py
+│       │   ├── stats.py    # /stats
+│       │   └── logs.py     # /logs - Sistema de auditoría
+│       ├── database/
+│       │   ├── database.py
+│       │   ├── models.py
+│       │   ├── schemas.py
+│       │   ├── crud.py
+│       │   ├── init_data.py
+│       │   └── log_helper.py  # Helpers para logs
+│       ├─── auth/       # jwt, password, crud, service, dependencies
+│       │   
+│       └── main.py
 ├── docs/
 │   ├── setup.md
 │   ├── api.md
@@ -46,7 +50,8 @@ inventario/
 ├── test/
 │   ├── test_api_endpoints.py
 │   ├── test_auth.py
-│   └── test_database.py
+│   ├── test_database.py
+│   └── test_logs.py  # 26 tests para logs
 ├── .env.example
 ├── run.py
 └── requirements.txt
@@ -86,15 +91,28 @@ API: <http://localhost:8000> • Docs: <http://localhost:8000/docs>
 - Desarrollo/Test: crea tablas automáticamente al iniciar.
 - Producción: no auto-crea tablas; se recomienda usar migraciones (Alembic).
 - Soporte: SQLite, PostgreSQL, MySQL.
+- **Nuevas tablas**: `tipos_log` y `logs` (inmutables para auditoría).
 
 Detalles en `docs/database.md`.
 
+### 📝 Sistema de Logs
+
+- **Inmutabilidad**: Los logs NO pueden modificarse ni eliminarse (HTTP 403).
+- **5 tipos predefinidos**: ERROR, WARNING, INFO, LOGIN, SIGNUP.
+- **Visibilidad controlada**: Los usuarios ven solo sus logs, los admins ven todos.
+- **Helpers**: `log_error()`, `log_warning()`, `log_info()`, `log_login()`, `log_signup()`.
+- **Logs automáticos**: Login, creación de productos, usuarios, empresas, y más.
+
+Ver documentación completa en `docs/database.md` sección "Sistema de Logs y Auditoría" y `docs/api.md` sección "Endpoints de Logs".
+
 ## 🧪 Tests
 
-- Estado actual: 61 tests pasando tras la refactorización de Fase 1.
+- Estado actual: **91 tests pasando** (61 originales + 26 tests de logs).
 
 ```powershell
 pytest -q
+# Tests específicos de logs
+pytest test/test_logs.py -v
 ```
 
 ## 📚 Documentación

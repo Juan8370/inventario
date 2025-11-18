@@ -3,7 +3,7 @@ from sqlalchemy.orm import Session
 from sqlalchemy import and_, or_
 from fastapi import HTTPException
 from pydantic import BaseModel
-from app.database.models import Base
+from app.src.database.models import Base
 
 # Tipos genéricos para el CRUD
 ModelType = TypeVar("ModelType", bound=Base)
@@ -331,3 +331,224 @@ class CRUDBase(Generic[ModelType, CreateSchemaType, UpdateSchemaType]):
                 query = query.filter(or_(*search_conditions))
         
         return query.offset(skip).limit(limit).all()
+
+
+class CRUDLog(Generic[ModelType, CreateSchemaType, UpdateSchemaType]):
+    """
+    Clase CRUD especial para Logs - INMUTABLE
+    Solo permite crear y leer, NO actualizar ni eliminar
+    """
+
+    def __init__(self, model: Type[ModelType]):
+        self.model = model
+
+    def create(self, db: Session, *, obj_in: CreateSchemaType) -> ModelType:
+        """
+        Crea un nuevo log (INMUTABLE - no se puede modificar después).
+        
+        Args:
+            db: Sesión de base de datos
+            obj_in: Esquema Pydantic con los datos del log
+            
+        Returns:
+            Log creado
+        """
+        obj_in_data = obj_in.dict() if hasattr(obj_in, 'dict') else obj_in.model_dump()
+        db_obj = self.model(**obj_in_data)
+        db.add(db_obj)
+        db.commit()
+        db.refresh(db_obj)
+        return db_obj
+
+    def get(self, db: Session, id: Any) -> Optional[ModelType]:
+        """
+        Obtiene un log por ID.
+        
+        Args:
+            db: Sesión de base de datos
+            id: ID del log
+            
+        Returns:
+            Log encontrado o None
+        """
+        return db.query(self.model).filter(self.model.id == id).first()
+
+    def get_multi(
+        self,
+        db: Session,
+        *,
+        skip: int = 0,
+        limit: int = 100,
+        filters: Optional[Dict[str, Any]] = None,
+        order_by: str = "fecha"
+    ) -> List[ModelType]:
+        """
+        Obtiene múltiples logs con paginación y filtros.
+        
+        Args:
+            db: Sesión de base de datos
+            skip: Número de registros a saltar
+            limit: Límite de registros a retornar
+            filters: Diccionario de filtros {campo: valor}
+            order_by: Campo por el cual ordenar (default: fecha descendente)
+            
+        Returns:
+            Lista de logs
+        """
+        from app.src.database.models import Log
+        query = db.query(self.model)
+        
+        # Aplicar filtros
+        if filters:
+            filter_conditions = []
+            for key, value in filters.items():
+                if hasattr(self.model, key):
+                    if isinstance(value, list):
+                        filter_conditions.append(getattr(self.model, key).in_(value))
+                    elif isinstance(value, dict):
+                        for op, val in value.items():
+                            if op == "gte":
+                                filter_conditions.append(getattr(self.model, key) >= val)
+                            elif op == "lte":
+                                filter_conditions.append(getattr(self.model, key) <= val)
+                    else:
+                        filter_conditions.append(getattr(self.model, key) == value)
+            
+            if filter_conditions:
+                query = query.filter(and_(*filter_conditions))
+        
+        # Ordenar por fecha descendente por defecto
+        if hasattr(self.model, order_by):
+            query = query.order_by(getattr(self.model, order_by).desc())
+        
+        return query.offset(skip).limit(limit).all()
+
+    def count(self, db: Session, filters: Optional[Dict[str, Any]] = None) -> int:
+        """
+        Cuenta el número de logs que cumplen con los filtros.
+        
+        Args:
+            db: Sesión de base de datos
+            filters: Diccionario de filtros
+            
+        Returns:
+            Número de logs
+        """
+        query = db.query(self.model)
+        
+        if filters:
+            filter_conditions = []
+            for key, value in filters.items():
+                if hasattr(self.model, key):
+                    if isinstance(value, list):
+                        filter_conditions.append(getattr(self.model, key).in_(value))
+                    else:
+                        filter_conditions.append(getattr(self.model, key) == value)
+            
+            if filter_conditions:
+                query = query.filter(and_(*filter_conditions))
+        
+        return query.count()
+
+    def get_by_usuario(
+        self,
+        db: Session,
+        usuario_id: int,
+        *,
+        skip: int = 0,
+        limit: int = 100
+    ) -> List[ModelType]:
+        """
+        Obtiene logs de un usuario específico.
+        
+        Args:
+            db: Sesión de base de datos
+            usuario_id: ID del usuario
+            skip: Número de registros a saltar
+            limit: Límite de registros
+            
+        Returns:
+            Lista de logs del usuario
+        """
+        return self.get_multi(
+            db,
+            skip=skip,
+            limit=limit,
+            filters={"usuario_id": usuario_id, "usuario_tipo": "USUARIO"}
+        )
+
+    def get_system_logs(
+        self,
+        db: Session,
+        *,
+        skip: int = 0,
+        limit: int = 100
+    ) -> List[ModelType]:
+        """
+        Obtiene logs del sistema (no visibles para usuarios normales).
+        
+        Args:
+            db: Sesión de base de datos
+            skip: Número de registros a saltar
+            limit: Límite de registros
+            
+        Returns:
+            Lista de logs del sistema
+        """
+        return self.get_multi(
+            db,
+            skip=skip,
+            limit=limit,
+            filters={"usuario_tipo": "SYSTEM"}
+        )
+
+    def get_by_tipo(
+        self,
+        db: Session,
+        tipo_log_id: int,
+        *,
+        skip: int = 0,
+        limit: int = 100
+    ) -> List[ModelType]:
+        """
+        Obtiene logs por tipo (ERROR, WARNING, INFO, LOGIN, SIGNUP).
+        
+        Args:
+            db: Sesión de base de datos
+            tipo_log_id: ID del tipo de log
+            skip: Número de registros a saltar
+            limit: Límite de registros
+            
+        Returns:
+            Lista de logs del tipo especificado
+        """
+        return self.get_multi(
+            db,
+            skip=skip,
+            limit=limit,
+            filters={"tipo_log_id": tipo_log_id}
+        )
+
+    def update(self, *args, **kwargs):
+        """Logs son INMUTABLES - no se pueden actualizar"""
+        raise HTTPException(
+            status_code=403,
+            detail="Los logs son inmutables y no pueden ser modificados"
+        )
+
+    def delete(self, *args, **kwargs):
+        """Logs son INMUTABLES - no se pueden eliminar"""
+        raise HTTPException(
+            status_code=403,
+            detail="Los logs son inmutables y no pueden ser eliminados"
+        )
+
+
+# Instancias de CRUD para modelos
+from app.src.database import models, schemas
+
+# CRUD para tipos y estados
+crud_tipo_log = CRUDBase[models.TipoLog, schemas.TipoLogCreate, schemas.TipoLogCreate](models.TipoLog)
+
+# CRUD para Log (inmutable)
+crud_log = CRUDLog[models.Log, schemas.LogCreate, None](models.Log)

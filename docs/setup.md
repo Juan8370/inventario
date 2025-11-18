@@ -371,9 +371,9 @@ inventario/
 | Archivo | Descripción |
 |---------|-------------|
 | `app/main.py` | Punto de entrada de la aplicación FastAPI |
-| `app/database/models.py` | Definiciones de tablas SQLAlchemy |
-| `app/database/schemas.py` | Validaciones Pydantic |
-| `app/database/crud.py` | Clase `CRUDBase` para operaciones genéricas |
+| `app/src/database/models.py` | Definiciones de tablas SQLAlchemy |
+| `app/src/database/schemas.py` | Validaciones Pydantic |
+| `app/src/database/crud.py` | Clase `CRUDBase` para operaciones genéricas |
 | `app/src/auth/*` | Sistema completo de autenticación JWT |
 | `run.py` | Script simple para iniciar el servidor |
 | `.env` | Configuración del entorno (NO versionar) |

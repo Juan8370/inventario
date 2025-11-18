@@ -1,11 +1,12 @@
 from fastapi import APIRouter, Depends, HTTPException, Query
 from sqlalchemy.orm import Session
 
-from app.database.database import get_db
-from app.database.crud import CRUDBase
-from app.database.models import Empresa, Usuario
-from app.database import schemas
+from app.src.database.database import get_db
+from app.src.database.crud import CRUDBase
+from app.src.database.models import Empresa, Usuario
+from app.src.database import schemas
 from app.src.auth import get_current_admin, get_current_user
+from app.src.database.log_helper import log_info
 
 
 router = APIRouter(prefix="/empresas", tags=["empresas"])
@@ -33,4 +34,18 @@ async def crear_empresa(
     empresa_existente = crud_empresa.get_by_field(db, "ruc", empresa.ruc)
     if empresa_existente:
         raise HTTPException(status_code=400, detail="Ya existe una empresa con este RUC")
-    return crud_empresa.create(db, obj_in=empresa)
+    
+    nueva_empresa = crud_empresa.create(db, obj_in=empresa)
+    
+    # Registrar creación de empresa
+    try:
+        log_info(
+            db,
+            f"Empresa creada: {nueva_empresa.razon_social} (RUC: {nueva_empresa.ruc})",
+            usuario_id=current_user.id,
+            usuario_tipo="USUARIO"
+        )
+    except Exception:
+        pass
+    
+    return nueva_empresa

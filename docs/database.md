@@ -10,7 +10,7 @@ Este sistema utiliza **SQLAlchemy** como ORM y **Pydantic v2** para validación 
 
 ### Configuración de Base de Datos
 
-**Archivo**: `app/database/database.py`
+**Archivo**: `app/src/database/database.py`
 
 - Motor: SQLAlchemy con soporte para SQLite, PostgreSQL, MySQL
 - Sesión: `SessionLocal` con autocommit/autoflush deshabilitado
@@ -18,7 +18,7 @@ Este sistema utiliza **SQLAlchemy** como ORM y **Pydantic v2** para validación 
 - Creación automática de tablas en startup (solo desarrollo/test; en producción usar migraciones)
 
 ```python
-from app.database.database import engine, SessionLocal, get_db
+from app.src.database.database import engine, SessionLocal, get_db
 
 # Usar en endpoints
 @app.get("/ejemplo")
@@ -146,6 +146,24 @@ def endpoint(db: Session = Depends(get_db)):
 | `fecha_creacion` | DateTime | Timestamp de creación | DEFAULT CURRENT_TIMESTAMP |
 
 **Ejemplos**: Activo, Licencia, Vacaciones, Retirado, Suspendido
+
+### TipoLog
+**Propósito**: Categorización de logs del sistema para auditoría y trazabilidad.
+
+| Campo | Tipo | Descripción | Restricciones |
+|-------|------|-------------|---------------|
+| `id` | Integer | Clave primaria | PRIMARY KEY, AUTO_INCREMENT |
+| `nombre` | String(50) | Nombre del tipo | UNIQUE, NOT NULL |
+| `descripcion` | Text | Descripción del tipo | NULLABLE |
+| `activo` | Boolean | Estado activo | DEFAULT TRUE |
+| `fecha_creacion` | DateTime | Timestamp de creación | DEFAULT CURRENT_TIMESTAMP |
+
+**Tipos Predefinidos**:
+- **ERROR**: Errores críticos en la aplicación
+- **WARNING**: Advertencias no críticas
+- **INFO**: Información sobre acciones realizadas
+- **LOGIN**: Inicios de sesión de usuarios
+- **SIGNUP**: Registros de nuevos usuarios
 
 ---
 
@@ -316,6 +334,32 @@ def endpoint(db: Session = Depends(get_db)):
 - `subtotal = (precio_unitario - descuento_unitario) * cantidad`
 - `cantidad > 0`
 
+### Log ⚠️ INMUTABLE
+**Propósito**: Registro de auditoría de todas las acciones del sistema. **Los logs NO pueden ser modificados ni eliminados una vez creados**.
+
+| Campo | Tipo | Descripción | Restricciones |
+|-------|------|-------------|---------------|
+| `id` | Integer | Clave primaria | PRIMARY KEY, AUTO_INCREMENT |
+| `descripcion` | Text | Descripción de la acción | NOT NULL |
+| `usuario_tipo` | String(20) | Tipo: SYSTEM o USUARIO | NOT NULL |
+| `tipo_log_id` | Integer | FK a TipoLog | FOREIGN KEY, NOT NULL |
+| `usuario_id` | Integer | FK a Usuario (NULL para SYSTEM) | FOREIGN KEY, NULLABLE |
+| `fecha` | DateTime | Timestamp del log | DEFAULT CURRENT_TIMESTAMP, INDEX |
+
+**Reglas de Inmutabilidad**:
+- ✅ **CREATE**: Permitido para admin y sistema
+- ❌ **UPDATE**: Bloqueado (HTTP 403)
+- ❌ **DELETE**: Bloqueado (HTTP 403)
+- 🔍 **READ**: Según permisos de visibilidad
+
+**Reglas de Visibilidad**:
+- **Logs SYSTEM**: Solo visibles para administradores
+- **Logs USUARIO**: Cada usuario ve solo los suyos, administradores ven todos
+
+**Validaciones**:
+- Logs tipo "SYSTEM" deben tener `usuario_id = NULL`
+- Logs tipo "USUARIO" deben tener `usuario_id` válido
+
 ---
 
 ## 🔗 Relaciones Entre Tablas
@@ -371,6 +415,16 @@ EstadoVenta (1) ──── (N) Venta
 - **Tipo**: One-to-Many (1:N)
 - **Descripción**: Un producto puede tener múltiples registros de inventario (por ubicación, lote, etc.)
 - **FK**: `inventario.producto_id → productos.id`
+
+#### Log ↔ Usuario
+- **Tipo**: Many-to-One (N:1)
+- **Descripción**: Un log puede estar asociado a un usuario (o NULL para logs del sistema), un usuario puede tener múltiples logs
+- **FK**: `logs.usuario_id → usuarios.id`
+
+#### Log ↔ TipoLog
+- **Tipo**: Many-to-One (N:1)
+- **Descripción**: Un log pertenece a un tipo específico, un tipo puede tener múltiples logs
+- **FK**: `logs.tipo_log_id → tipos_log.id`
 
 ---
 
@@ -558,16 +612,16 @@ def validar_precios(cls, values):
 
 ### Descripción
 
-**Archivo**: `app/database/crud.py`
+**Archivo**: `app/src/database/crud.py`
 
 `CRUDBase` provee operaciones CRUD reutilizables para cualquier modelo SQLAlchemy, reduciendo la duplicación de código.
 
 ### Uso Básico
 
 ```python
-from app.database.crud import CRUDBase
-from app.database.models import Producto
-from app.database import schemas
+from app.src.database.crud import CRUDBase
+from app.src.database.models import Producto
+from app.src.database import schemas
 
 # Instanciar CRUD para Producto
 crud_producto = CRUDBase[Producto, schemas.ProductoCreate, schemas.ProductoUpdate](Producto)
@@ -729,6 +783,50 @@ usuario_modificacion = session.query(Usuario)\
     .first()
 ```
 
+### 6. Sistema de Logs Inmutables
+
+```python
+from app.src.database.log_helper import log_info, log_error, log_login, log_signup
+
+# Registrar información del sistema
+log_info(db, "Aplicación iniciada correctamente", usuario_tipo="SYSTEM")
+
+# Registrar error crítico
+log_error(db, f"Error al procesar venta: {error_msg}", usuario_tipo="SYSTEM")
+
+# Registrar acción de usuario
+log_info(
+    db, 
+    f"Usuario {usuario.username} creó producto {producto.nombre}",
+    usuario_id=usuario.id,
+    usuario_tipo="USUARIO"
+)
+
+# Registrar login exitoso
+log_login(db, usuario_id=usuario.id, descripcion=f"Login desde IP {ip_address}")
+
+# Registrar nuevo usuario
+log_signup(db, usuario_id=nuevo_usuario.id, descripcion=f"Nuevo usuario registrado: {nuevo_usuario.email}")
+
+# Consultar logs de un usuario (solo ve los suyos)
+from app.src.database.crud import crud_log
+mis_logs = crud_log.get_by_usuario(db, usuario_id=usuario.id)
+
+# Consultar logs del sistema (solo admin)
+logs_sistema = crud_log.get_system_logs(db, limit=100)
+
+# Filtrar por tipo de log
+tipo_error = crud_tipo_log.get_by_field(db, "nombre", "ERROR")
+logs_error = crud_log.get_by_tipo(db, tipo_log_id=tipo_error.id)
+```
+
+**Características del Sistema de Logs**:
+- **Inmutabilidad**: Los logs no pueden modificarse ni eliminarse después de su creación
+- **Visibilidad controlada**: Los usuarios solo ven sus propios logs, los admins ven todos
+- **Logs del sistema**: Invisibles para usuarios normales, solo admins pueden consultarlos
+- **Tipos predefinidos**: ERROR, WARNING, INFO, LOGIN, SIGNUP
+- **Helpers**: Funciones de conveniencia para registro rápido de logs
+
 ---
 
 ## 🔒 Consideraciones de Seguridad
@@ -776,11 +874,239 @@ usuario_modificacion = session.query(Usuario)\
 ## 📞 Soporte y Documentación
 
 Para más información sobre la implementación, consultar:
-- `app/database/models.py` - Modelos SQLAlchemy
-- `app/database/schemas.py` - Esquemas Pydantic  
+- `app/src/database/models.py` - Modelos SQLAlchemy
+- `app/src/database/schemas.py` - Esquemas Pydantic  
 - `docs/api/` - Documentación de endpoints (próximamente)
 - `tests/` - Casos de prueba y ejemplos de uso
 
 ---
 
-*Documentación actualizada el 16 de Noviembre de 2025*
+## 📋 Sistema de Logs y Auditoría
+
+### Arquitectura de Logs
+
+El sistema implementa un **registro de auditoría inmutable** que captura todas las acciones críticas del sistema y de los usuarios. Los logs están diseñados para cumplir con requisitos de trazabilidad y compliance.
+
+### Características Principales
+
+#### Inmutabilidad
+- **No se pueden modificar**: Una vez creado, un log no puede ser editado
+- **No se pueden eliminar**: Los logs son permanentes, ni siquiera los administradores pueden borrarlos
+- **Solo lectura**: Las operaciones permitidas son CREATE y READ únicamente
+
+#### Clasificación de Logs
+
+**Por Tipo** (`TipoLog`):
+- `ERROR`: Errores críticos que afectan la funcionalidad
+- `WARNING`: Advertencias que requieren atención pero no bloquean operaciones
+- `INFO`: Información sobre acciones normales del sistema
+- `LOGIN`: Registro de inicios de sesión
+- `SIGNUP`: Registro de creación de nuevos usuarios
+
+**Por Origen** (`usuario_tipo`):
+- `SYSTEM`: Logs generados automáticamente por el sistema (sin usuario_id)
+- `USUARIO`: Logs asociados a acciones de usuarios específicos (con usuario_id)
+
+#### Reglas de Visibilidad
+
+1. **Usuarios Normales**:
+   - Solo pueden ver sus propios logs (donde `usuario_id = su_id`)
+   - NO pueden ver logs del sistema
+   - NO pueden ver logs de otros usuarios
+
+2. **Administradores**:
+   - Pueden ver todos los logs de usuarios
+   - Pueden ver logs del sistema
+   - Pueden crear logs manualmente para auditoría
+
+### Endpoints de API
+
+```
+GET /logs/              # Lista logs según permisos del usuario
+GET /logs/me            # Logs del usuario actual
+GET /logs/system        # Logs del sistema (solo admin)
+GET /logs/{id}          # Obtener log específico (con validación)
+GET /logs/tipos         # Lista tipos de log disponibles
+POST /logs/             # Crear log manualmente (solo admin)
+```
+
+### Uso con Helpers
+
+```python
+from app.src.database.log_helper import (
+    log_error, log_warning, log_info, log_login, log_signup
+)
+
+# Log de sistema
+log_error(db, "Error al conectar con servicio externo")
+log_warning(db, "Stock bajo del producto X")
+log_info(db, "Respaldo de base de datos completado")
+
+# Log de usuario
+log_info(
+    db, 
+    f"Producto {producto.codigo} actualizado",
+    usuario_id=current_user.id,
+    usuario_tipo="USUARIO"
+)
+
+# Eventos de autenticación
+log_login(db, usuario_id=user.id, descripcion=f"Login desde {ip}")
+log_signup(db, usuario_id=new_user.id)
+```
+
+### Consultas de Logs
+
+```python
+from app.src.database.crud import crud_log
+
+# Paginación con filtros
+logs = crud_log.get_multi(
+    db,
+    skip=0,
+    limit=50,
+    filters={
+        "tipo_log_id": tipo_error.id,
+        "fecha": {"gte": fecha_inicio, "lte": fecha_fin}
+    }
+)
+
+# Logs de un usuario específico
+user_logs = crud_log.get_by_usuario(db, usuario_id=user_id, limit=100)
+
+# Logs del sistema
+system_logs = crud_log.get_system_logs(db, limit=100)
+
+# Filtrar por tipo
+error_logs = crud_log.get_by_tipo(db, tipo_log_id=tipo_error.id)
+```
+
+### Validaciones Automáticas
+
+```python
+# ✅ Válido - Log del sistema sin usuario
+LogCreate(
+    descripcion="Backup completado",
+    usuario_tipo="SYSTEM",
+    tipo_log_id=tipo_info_id,
+    usuario_id=None
+)
+
+# ✅ Válido - Log de usuario con ID
+LogCreate(
+    descripcion="Producto creado",
+    usuario_tipo="USUARIO",
+    tipo_log_id=tipo_info_id,
+    usuario_id=123
+)
+
+# ❌ Inválido - Log SYSTEM con usuario_id
+# Lanza: ValueError("Los logs de tipo SYSTEM no deben tener usuario_id")
+
+# ❌ Inválido - Log USUARIO sin usuario_id
+# Lanza: ValueError("Los logs de tipo USUARIO deben tener usuario_id")
+```
+
+### Casos de Uso
+
+#### 1. Auditoría de Seguridad
+```python
+# Registrar intentos de login fallidos
+log_warning(
+    db,
+    f"Intento de login fallido para email: {email}",
+    usuario_tipo="SYSTEM"
+)
+
+# Registrar cambios de contraseña
+log_info(
+    db,
+    "Contraseña cambiada exitosamente",
+    usuario_id=user.id,
+    usuario_tipo="USUARIO"
+)
+```
+
+#### 2. Trazabilidad de Operaciones
+```python
+# Registrar creación de venta
+log_info(
+    db,
+    f"Venta {venta.numero_venta} creada por ${venta.total}",
+    usuario_id=current_user.id,
+    usuario_tipo="USUARIO"
+)
+
+# Registrar modificación de inventario
+log_info(
+    db,
+    f"Inventario actualizado: Producto {producto.codigo}, Cantidad: {nueva_cantidad}",
+    usuario_id=current_user.id,
+    usuario_tipo="USUARIO"
+)
+```
+
+#### 3. Monitoreo del Sistema
+```python
+# Errores críticos
+try:
+    procesar_orden()
+except Exception as e:
+    log_error(db, f"Error procesando orden: {str(e)}")
+    raise
+
+# Advertencias de stock
+if inventario.cantidad_actual <= producto.stock_minimo:
+    log_warning(
+        db,
+        f"Stock bajo: {producto.nombre} (Actual: {inventario.cantidad_actual}, Mínimo: {producto.stock_minimo})"
+    )
+```
+
+### Reportes y Análisis
+
+```python
+# Contar errores por día
+from sqlalchemy import func, cast, Date
+
+errores_diarios = db.query(
+    cast(Log.fecha, Date).label('dia'),
+    func.count(Log.id).label('total')
+).join(TipoLog)\
+.filter(TipoLog.nombre == 'ERROR')\
+.group_by(cast(Log.fecha, Date))\
+.all()
+
+# Usuarios más activos
+usuarios_activos = db.query(
+    Usuario.username,
+    func.count(Log.id).label('acciones')
+).join(Log)\
+.filter(Log.usuario_tipo == 'USUARIO')\
+.group_by(Usuario.id)\
+.order_by(func.count(Log.id).desc())\
+.limit(10)\
+.all()
+```
+
+### Consideraciones de Rendimiento
+
+- **Índice en fecha**: Optimiza consultas por rango temporal
+- **Particionado**: Considerar para tablas con millones de registros
+- **Archivado**: Implementar estrategia de archivado para logs antiguos
+- **Paginación**: Siempre usar LIMIT/OFFSET en consultas de logs
+
+### Tests Automatizados
+
+El sistema incluye **26 tests automatizados** que validan:
+- ✅ Creación de logs SYSTEM y USUARIO
+- ✅ Validaciones de integridad referencial
+- ✅ Inmutabilidad (bloqueo de UPDATE y DELETE)
+- ✅ Visibilidad según roles
+- ✅ Filtros y búsquedas
+- ✅ Endpoints de API con autenticación
+- ✅ Helpers de creación de logs
+
+---
+
+*Documentación actualizada el 18 de Noviembre de 2025*

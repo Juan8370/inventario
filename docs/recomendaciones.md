@@ -16,7 +16,7 @@ Este documento propone mejoras incrementales para escalar y mantener el proyecto
 ## 🧱 Cambios Estructurales (mediano plazo)
 
 - **Módulos por dominio**: renombrar `app/src/auth` a `app/auth` y considerar `app/modules/<dominio>/*` para agrupar `routers`, `schemas`, `service`, `repository` por funcionalidad.
-- **Separar schemas del ORM**: mover `app/database/schemas.py` a `app/schemas/` o por dominio (`app/productos/schemas.py`). Mantiene desacoplada la capa API de la persistencia.
+- **Separar schemas del ORM**: mover `app/src/database/schemas.py` a `app/src/schemas/` o por dominio (`app/src/productos/schemas.py`). Mantiene desacoplada la capa API de la persistencia.
 - **Capa de servicios**: formalizar servicios por dominio (por ejemplo `app/productos/service.py`) para concentrar reglas de negocio fuera de los routers.
 - **Utilidades de paginación/filtros**: extraer validaciones y parámetros comunes (paginación, orden, búsqueda) a `app/common/pagination.py` y `app/common/filters.py`.
 

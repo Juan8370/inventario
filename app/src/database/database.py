@@ -2,7 +2,7 @@ from sqlalchemy import create_engine
 from sqlalchemy.orm import sessionmaker, Session
 from typing import Generator
 
-from app.core.settings import get_settings
+from app.src.core.settings import get_settings
 
 settings = get_settings()
 
@@ -34,7 +34,7 @@ def create_tables():
     """
     Crea todas las tablas definidas en los modelos.
     """
-    from app.database.models import Base
+    from app.src.database.models import Base
     Base.metadata.create_all(bind=engine)
 
 # Función para eliminar todas las tablas
@@ -43,5 +43,5 @@ def drop_tables():
     Elimina todas las tablas de la base de datos.
     ¡Usar con precaución!
     """
-    from app.database.models import Base
+    from app.src.database.models import Base
     Base.metadata.drop_all(bind=engine)

@@ -14,10 +14,11 @@ Todos los endpoints devuelven códigos de estado HTTP correctos (200/201/400/401
 2. [System](#system)
 3. [Endpoints de Productos](#endpoints-de-productos)
 4. [Endpoints de Empresas](#endpoints-de-empresas)
-5. [Protección de Endpoints](#protección-de-endpoints)
-6. [Uso de Tokens](#uso-de-tokens)
-7. [Gestión de Usuarios](#gestión-de-usuarios)
-8. [Códigos de Estado](#códigos-de-estado)
+5. [Endpoints de Logs](#endpoints-de-logs)
+6. [Protección de Endpoints](#protección-de-endpoints)
+7. [Uso de Tokens](#uso-de-tokens)
+8. [Gestión de Usuarios](#gestión-de-usuarios)
+9. [Códigos de Estado](#códigos-de-estado)
 
 ---
 
@@ -453,6 +454,224 @@ Crea una nueva empresa.
 **Errores:**
 - `400 Bad Request`: RUC duplicado
 - `422 Unprocessable Entity`: Datos inválidos
+
+---
+
+## Endpoints de Logs
+
+El sistema de logs proporciona auditoría y trazabilidad inmutable de todas las acciones del sistema.
+
+### Características
+
+- **Inmutabilidad**: Los logs no pueden modificarse ni eliminarse (HTTP 403)
+- **Visibilidad controlada**: Usuarios ven solo sus logs, admins ven todos
+- **5 tipos predefinidos**: ERROR, WARNING, INFO, LOGIN, SIGNUP
+
+### Listar Logs (con permisos)
+
+**GET** `/logs?skip=0&limit=50`
+
+Lista logs según permisos del usuario actual.
+
+**Autenticación requerida**: Sí (Usuario o Admin)
+
+**Response (200 OK):**
+```json
+[
+  {
+    "id": 1,
+    "descripcion": "Producto creado: Laptop Dell (código: LP001)",
+    "usuario_tipo": "USUARIO",
+    "tipo_log_id": 3,
+    "usuario_id": 1,
+    "fecha": "2025-11-18T10:30:00",
+    "tipo_log": {
+      "id": 3,
+      "nombre": "INFO",
+      "descripcion": "Información sobre las acciones"
+    },
+    "usuario": {
+      "id": 1,
+      "username": "admin",
+      "email": "admin@ejemplo.com"
+    }
+  }
+]
+```
+
+### Obtener Mis Logs
+
+**GET** `/logs/me?skip=0&limit=50`
+
+Obtiene solo los logs del usuario actual.
+
+**Autenticación requerida**: Sí (Usuario)
+
+**Response (200 OK):**
+```json
+[
+  {
+    "id": 5,
+    "descripcion": "Login exitoso: user@ejemplo.com",
+    "usuario_tipo": "USUARIO",
+    "tipo_log_id": 4,
+    "usuario_id": 2,
+    "fecha": "2025-11-18T09:15:00"
+  }
+]
+```
+
+### Obtener Logs del Sistema
+
+**GET** `/logs/system?limit=100`
+
+Obtiene logs del sistema (invisibles para usuarios normales).
+
+**Autenticación requerida**: Sí (Solo Admin)
+
+**Response (200 OK):**
+```json
+[
+  {
+    "id": 10,
+    "descripcion": "Error de prueba: Conexión con API externa falló",
+    "usuario_tipo": "SYSTEM",
+    "tipo_log_id": 1,
+    "usuario_id": null,
+    "fecha": "2025-11-18T08:00:00"
+  }
+]
+```
+
+**Errores:**
+- `403 Forbidden`: Usuario no tiene permisos para ver logs del sistema
+
+### Obtener Log Específico
+
+**GET** `/logs/{log_id}`
+
+Obtiene un log por su ID (con validación de permisos).
+
+**Autenticación requerida**: Sí (Usuario o Admin)
+
+**Response (200 OK):**
+```json
+{
+  "id": 1,
+  "descripcion": "Producto creado: Laptop Dell (código: LP001)",
+  "usuario_tipo": "USUARIO",
+  "tipo_log_id": 3,
+  "usuario_id": 1,
+  "fecha": "2025-11-18T10:30:00"
+}
+```
+
+**Errores:**
+- `403 Forbidden`: El usuario no tiene permiso para ver este log
+- `404 Not Found`: Log no encontrado
+
+### Crear Log Manualmente
+
+**POST** `/logs`
+
+Crea un log manualmente (solo admin).
+
+**Autenticación requerida**: Sí (Solo Admin)
+
+**Request:**
+```json
+{
+  "descripcion": "Mantenimiento del sistema realizado",
+  "usuario_tipo": "SYSTEM",
+  "tipo_log_id": 3,
+  "usuario_id": null
+}
+```
+
+**Response (201 Created):**
+```json
+{
+  "id": 15,
+  "descripcion": "Mantenimiento del sistema realizado",
+  "usuario_tipo": "SYSTEM",
+  "tipo_log_id": 3,
+  "usuario_id": null,
+  "fecha": "2025-11-18T11:00:00"
+}
+```
+
+**Errores:**
+- `403 Forbidden`: Solo administradores pueden crear logs manualmente
+- `400 Bad Request`: Validación fallida (ej: SYSTEM con usuario_id, USUARIO sin usuario_id)
+
+### Listar Tipos de Log
+
+**GET** `/logs/tipos`
+
+Lista todos los tipos de log disponibles.
+
+**Autenticación requerida**: Sí (Usuario)
+
+**Response (200 OK):**
+```json
+[
+  {
+    "id": 1,
+    "nombre": "ERROR",
+    "descripcion": "Errores críticos en la aplicación",
+    "activo": true,
+    "fecha_creacion": "2025-11-18T00:00:00"
+  },
+  {
+    "id": 2,
+    "nombre": "WARNING",
+    "descripcion": "Errores de advertencias no críticos",
+    "activo": true,
+    "fecha_creacion": "2025-11-18T00:00:00"
+  },
+  {
+    "id": 3,
+    "nombre": "INFO",
+    "descripcion": "Información sobre las acciones",
+    "activo": true,
+    "fecha_creacion": "2025-11-18T00:00:00"
+  },
+  {
+    "id": 4,
+    "nombre": "LOGIN",
+    "descripcion": "Inicio de sesión de usuario",
+    "activo": true,
+    "fecha_creacion": "2025-11-18T00:00:00"
+  },
+  {
+    "id": 5,
+    "nombre": "SIGNUP",
+    "descripcion": "Usuario creado",
+    "activo": true,
+    "fecha_creacion": "2025-11-18T00:00:00"
+  }
+]
+```
+
+### Eventos que Generan Logs Automáticamente
+
+El sistema registra automáticamente los siguientes eventos:
+
+**Autenticación:**
+- ✅ Login exitoso → `LOGIN`
+- ✅ Intento de login fallido → `ERROR`
+
+**Productos:**
+- ✅ Crear producto → `INFO`
+- ✅ Actualizar producto → `INFO`
+- ✅ Eliminar producto → `INFO`
+
+**Usuarios:**
+- ✅ Crear usuario → `SIGNUP` + `INFO`
+- ✅ Cambiar contraseña → `INFO`
+
+**Empresas:**
+- ✅ Crear empresa → `INFO`
 
 ---
 

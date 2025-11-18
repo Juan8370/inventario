@@ -1,9 +1,9 @@
 from sqlalchemy.orm import Session
 from typing import Optional
 from datetime import datetime
-from app.database.models import Usuario
-from app.database.crud import CRUDBase
-from app.database.schemas import UsuarioCreate, UsuarioUpdate
+from app.src.database.models import Usuario
+from app.src.database.crud import CRUDBase
+from app.src.database.schemas import UsuarioCreate, UsuarioUpdate
 from app.src.auth.password import PasswordHandler
 
 

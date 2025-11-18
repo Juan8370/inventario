@@ -1,10 +1,10 @@
 from fastapi import APIRouter, Depends
 from sqlalchemy.orm import Session
 
-from app.database import schemas
-from app.database.crud import CRUDBase
-from app.database.database import get_db
-from app.database.models import Empresa, Producto, Usuario
+from app.src.database import schemas
+from app.src.database.crud import CRUDBase
+from app.src.database.database import get_db
+from app.src.database.models import Empresa, Producto, Usuario
 from app.src.auth import get_current_user
 
 

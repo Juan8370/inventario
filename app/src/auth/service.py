@@ -5,7 +5,8 @@ from fastapi import HTTPException, status
 from app.src.auth.jwt import JWTHandler
 from app.src.auth.crud import crud_usuario
 from app.src.auth.schemas import LoginRequest, TokenResponse, TokenData
-from app.database.models import Usuario
+from app.src.database.models import Usuario
+from app.src.database.log_helper import log_login, log_error
 
 
 class AuthService:
@@ -45,6 +46,11 @@ class AuthService:
         )
         
         if not usuario:
+            # Registrar intento fallido
+            try:
+                log_error(db, f"Intento de login fallido para: {login_data.email}")
+            except Exception:
+                pass
             raise HTTPException(
                 status_code=status.HTTP_401_UNAUTHORIZED,
                 detail="Email o contraseña incorrectos",
@@ -60,6 +66,12 @@ class AuthService:
         
         # Actualizar fecha de último acceso
         crud_usuario.update_last_access(db=db, usuario_id=usuario.id)
+        
+        # Registrar login exitoso
+        try:
+            log_login(db, usuario_id=usuario.id, descripcion=f"Login exitoso: {usuario.email}")
+        except Exception:
+            pass  # No fallar el login por error en logging
         
         # Crear token
         token_data = {

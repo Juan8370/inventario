@@ -2,17 +2,18 @@ import logging
 from fastapi import FastAPI
 from fastapi.middleware.cors import CORSMiddleware
 
-from app.core.exception_handlers import register_exception_handlers
-from app.core.logging import setup_logging
-from app.core.settings import get_settings
-from app.database.database import create_tables, SessionLocal
-from app.database.init_data import inicializar_datos_desarrollo
-from app.routers import auth as auth_router
-from app.routers import empresas as empresas_router
-from app.routers import productos as productos_router
-from app.routers import system as system_router
-from app.routers import usuarios as usuarios_router
-from app.routers import stats as stats_router
+from app.src.core.exception_handlers import register_exception_handlers
+from app.src.core.logging import setup_logging
+from app.src.core.settings import get_settings
+from app.src.database.database import create_tables, SessionLocal
+from app.src.database.init_data import inicializar_datos_desarrollo
+from app.src.routers import auth as auth_router
+from app.src.routers import empresas as empresas_router
+from app.src.routers import productos as productos_router
+from app.src.routers import system as system_router
+from app.src.routers import usuarios as usuarios_router
+from app.src.routers import stats as stats_router
+from app.src.routers import logs as logs_router
 
 
 settings = get_settings()
@@ -46,6 +47,7 @@ app.include_router(productos_router.router)
 app.include_router(empresas_router.router)
 app.include_router(usuarios_router.router)
 app.include_router(stats_router.router)
+app.include_router(logs_router.router)
 
 # Exception handlers
 register_exception_handlers(app)

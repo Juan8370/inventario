@@ -3,10 +3,10 @@ Inicialización de datos por defecto para desarrollo
 """
 import logging
 from sqlalchemy.orm import Session
-from app.database.models import TipoUsuario, EstadoUsuario, Usuario
+from app.src.database.models import TipoUsuario, EstadoUsuario, Usuario, TipoLog
 from app.src.auth import crud_usuario
-from app.database.schemas import UsuarioCreate
-from app.core.settings import get_settings
+from app.src.database.schemas import UsuarioCreate
+from app.src.core.settings import get_settings
 
 logger = logging.getLogger(__name__)
 settings = get_settings()
@@ -26,6 +26,28 @@ def crear_tipos_usuario_default(db: Session):
         
         if not tipo_existente:
             nuevo_tipo = TipoUsuario(**tipo_data)
+            db.add(nuevo_tipo)
+    
+    db.commit()
+
+
+def crear_tipos_log_default(db: Session):
+    """Crear tipos de log por defecto si no existen"""
+    tipos_default = [
+        {"nombre": "ERROR", "descripcion": "Errores críticos en la aplicación"},
+        {"nombre": "WARNING", "descripcion": "Errores de advertencias no críticos"},
+        {"nombre": "INFO", "descripcion": "Información sobre las acciones"},
+        {"nombre": "LOGIN", "descripcion": "Inicio de sesión de usuario"},
+        {"nombre": "SIGNUP", "descripcion": "Usuario creado"},
+    ]
+    
+    for tipo_data in tipos_default:
+        tipo_existente = db.query(TipoLog).filter(
+            TipoLog.nombre == tipo_data["nombre"]
+        ).first()
+        
+        if not tipo_existente:
+            nuevo_tipo = TipoLog(**tipo_data)
             db.add(nuevo_tipo)
     
     db.commit()
@@ -99,6 +121,7 @@ def inicializar_datos_desarrollo(db: Session):
 
     crear_tipos_usuario_default(db)
     crear_estados_usuario_default(db)
+    crear_tipos_log_default(db)
     crear_usuario_admin_default(db)
 
     logger.info("Inicialización de datos completada")

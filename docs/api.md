@@ -14,11 +14,13 @@ Todos los endpoints devuelven códigos de estado HTTP correctos (200/201/400/401
 2. [System](#system)
 3. [Endpoints de Productos](#endpoints-de-productos)
 4. [Endpoints de Empresas](#endpoints-de-empresas)
-5. [Endpoints de Logs](#endpoints-de-logs)
-6. [Protección de Endpoints](#protección-de-endpoints)
-7. [Uso de Tokens](#uso-de-tokens)
-8. [Gestión de Usuarios](#gestión-de-usuarios)
-9. [Códigos de Estado](#códigos-de-estado)
+5. [Endpoints de Transacciones](#endpoints-de-transacciones)
+6. [Endpoints de Compras](#endpoints-de-compras)
+7. [Endpoints de Logs](#endpoints-de-logs)
+8. [Protección de Endpoints](#protección-de-endpoints)
+9. [Uso de Tokens](#uso-de-tokens)
+10. [Gestión de Usuarios](#gestión-de-usuarios)
+11. [Códigos de Estado](#códigos-de-estado)
 
 ---
 
@@ -177,7 +179,8 @@ Retorna información general de la API.
 {
   "message": "Bienvenido al Sistema de Inventario",
   "version": "1.0.0",
-  "docs": "/docs"
+  "docs": "/docs",
+  "redoc": "/redoc"
 }
 ```
 
@@ -190,17 +193,17 @@ Verifica estado de la aplicación y conexión a base de datos.
 **Response (200 OK):**
 ```json
 {
-  "status": "healthy",
-  "database": "connected"
+  "status": "OK",
+  "message": "API funcionando correctamente",
+  "database": "conectada",
+  "environment": "development"
 }
 ```
 
 **Response (503 Service Unavailable):**
 ```json
 {
-  "status": "unhealthy",
-  "database": "disconnected",
-  "error": "Database connection failed"
+  "detail": "Error de conexión con la base de datos"
 }
 ```
 
@@ -454,6 +457,197 @@ Crea una nueva empresa.
 **Errores:**
 - `400 Bad Request`: RUC duplicado
 - `422 Unprocessable Entity`: Datos inválidos
+
+---
+
+## Endpoints de Transacciones
+
+Las transacciones registran movimientos de inventario (ENTRADA/SALIDA) y actualizan automáticamente el `Inventario` del producto. La cantidad siempre es positiva; para SALIDA se valida stock suficiente.
+
+### Crear Transacción
+
+**POST** `/transacciones/`
+
+Requiere autenticación. Actualiza inventario según tipo.
+
+**Request:**
+```json
+{
+  "tipo_transaccion_id": 1,  
+  "producto_id": 123,
+  "cantidad": 10,
+  "fecha": "2025-11-18T12:00:00",
+  "observaciones": "Ingreso por compra",
+  "compra_id": null,
+  "venta_id": null
+}
+```
+
+**Response (201 Created):**
+```json
+{
+  "id": 1,
+  "tipo_transaccion_id": 1,
+  "producto_id": 123,
+  "cantidad": 10.0,
+  "usuario_id": 1,
+  "fecha": "2025-11-18T12:00:00",
+  "observaciones": "Ingreso por compra",
+  "compra_id": null,
+  "venta_id": null,
+  "fecha_registro": "2025-11-18T12:00:05"
+}
+```
+
+**Errores:**
+- `404 Not Found`: Producto o tipo de transacción no existe
+- `400 Bad Request`: Stock insuficiente para SALIDA
+- `422 Unprocessable Entity`: Datos inválidos
+
+### Listar Transacciones
+
+**GET** `/transacciones?skip=0&limit=50`
+
+Paginado simple.
+
+### Transacciones por Producto
+
+**GET** `/transacciones/producto/{producto_id}?skip=0&limit=50`
+
+### Stock Actual del Producto
+
+**GET** `/transacciones/stock/{producto_id}`
+
+Calcula stock con: `stock_actual = SUM(ENTRADAS) - SUM(SALIDAS)`.
+
+**Response (200 OK):**
+```json
+{
+  "producto_id": 123,
+  "codigo": "PROD-001",
+  "nombre": "Producto X",
+  "stock_actual": 42.0,
+  "stock_minimo": 5,
+  "bajo_stock": false
+}
+```
+
+### Listar Entradas/Salidas
+
+**GET** `/transacciones/entradas?producto_id=123&skip=0&limit=50`
+
+**GET** `/transacciones/salidas?producto_id=123&skip=0&limit=50`
+
+### Productos Bajo Stock
+
+**GET** `/transacciones/reportes/bajo-stock?limite=10`
+
+### Listar Tipos de Transacción
+
+**GET** `/transacciones/tipos`
+
+---
+
+## Endpoints de Compras
+
+Compras funciona como cabecera; las líneas se registran como transacciones de tipo ENTRADA asociadas por `compra_id` y actualizan el inventario automáticamente.
+
+### Crear Compra (cabecera)
+
+**POST** `/compras/`
+
+Requiere autenticación; el `usuario_id` se toma del token. El total se recalcula: `total = subtotal + impuesto - descuento (>= 0)`.
+
+**Request:**
+```json
+{
+  "numero_compra": "C-0001",
+  "proveedor_id": 123,
+  "tienda": "Central",
+  "subtotal": 100.00,
+  "impuesto": 18.00,
+  "descuento": 10.00,
+  "observaciones": "Compra inicial"
+}
+```
+
+**Response (201 Created):**
+```json
+{
+  "id": 1,
+  "numero_compra": "C-0001",
+  "proveedor_id": 123,
+  "tienda": "Central",
+  "subtotal": 100.0,
+  "impuesto": 18.0,
+  "descuento": 10.0,
+  "total": 108.0,
+  "usuario_id": 7,
+  "fecha_compra": "2025-11-18T12:00:00",
+  "fecha_creacion": "2025-11-18T12:00:05",
+  "fecha_actualizacion": "2025-11-18T12:00:05"
+}
+```
+
+### Listar Compras (filtros)
+
+**GET** `/compras?proveedor_id=123&fecha_desde=2025-11-01&fecha_hasta=2025-11-30&numero=C-0001&skip=0&limit=50`
+
+Campos de filtro admitidos: `proveedor_id`, `fecha_compra (gte/lte)`, `numero_compra`.
+
+### Obtener Compra por ID
+
+**GET** `/compras/{compra_id}`
+
+### Agregar Items (transacciones ENTRADA) a una Compra
+
+**POST** `/compras/{compra_id}/transacciones`
+
+Cada item genera una transacción ENTRADA con `compra_id` y actualiza inventario del producto.
+
+**Request:**
+```json
+{
+  "items": [
+    {"producto_id": 10, "cantidad": 5, "observaciones": "Lote A"},
+    {"producto_id": 10, "cantidad": 3}
+  ]
+}
+```
+
+**Response (201 Created):**
+```json
+[
+  {
+    "id": 101,
+    "tipo_transaccion_id": 1,
+    "producto_id": 10,
+    "cantidad": 5.0,
+    "usuario_id": 7,
+    "fecha": "2025-11-18T12:05:00",
+    "observaciones": "Lote A",
+    "compra_id": 1,
+    "venta_id": null,
+    "fecha_registro": "2025-11-18T12:05:02"
+  },
+  {
+    "id": 102,
+    "tipo_transaccion_id": 1,
+    "producto_id": 10,
+    "cantidad": 3.0,
+    "usuario_id": 7,
+    "fecha": "2025-11-18T12:05:00",
+    "observaciones": "Compra #1",
+    "compra_id": 1,
+    "venta_id": null,
+    "fecha_registro": "2025-11-18T12:05:02"
+  }
+]
+```
+
+### Listar Items de una Compra
+
+**GET** `/compras/{compra_id}/transacciones?skip=0&limit=100`
 
 ---
 

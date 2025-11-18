@@ -3,7 +3,7 @@ Inicialización de datos por defecto para desarrollo
 """
 import logging
 from sqlalchemy.orm import Session
-from app.src.database.models import TipoUsuario, EstadoUsuario, Usuario, TipoLog
+from app.src.database.models import TipoUsuario, EstadoUsuario, Usuario, TipoLog, TipoTransaccion
 from app.src.auth import crud_usuario
 from app.src.database.schemas import UsuarioCreate
 from app.src.core.settings import get_settings
@@ -48,6 +48,25 @@ def crear_tipos_log_default(db: Session):
         
         if not tipo_existente:
             nuevo_tipo = TipoLog(**tipo_data)
+            db.add(nuevo_tipo)
+    
+    db.commit()
+
+
+def crear_tipos_transaccion_default(db: Session):
+    """Crear tipos de transacción por defecto si no existen"""
+    tipos_default = [
+        {"nombre": "ENTRADA", "descripcion": "Entrada de productos al inventario"},
+        {"nombre": "SALIDA", "descripcion": "Salida de productos del inventario"},
+    ]
+    
+    for tipo_data in tipos_default:
+        tipo_existente = db.query(TipoTransaccion).filter(
+            TipoTransaccion.nombre == tipo_data["nombre"]
+        ).first()
+        
+        if not tipo_existente:
+            nuevo_tipo = TipoTransaccion(**tipo_data)
             db.add(nuevo_tipo)
     
     db.commit()
@@ -122,6 +141,7 @@ def inicializar_datos_desarrollo(db: Session):
     crear_tipos_usuario_default(db)
     crear_estados_usuario_default(db)
     crear_tipos_log_default(db)
+    crear_tipos_transaccion_default(db)
     crear_usuario_admin_default(db)
 
     logger.info("Inicialización de datos completada")

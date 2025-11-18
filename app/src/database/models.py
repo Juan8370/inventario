@@ -102,6 +102,18 @@ class EstadoEmpleado(Base):
     # Relación
     empleados = relationship("Empleado", back_populates="estado_empleado")
 
+class TipoTransaccion(Base):
+    __tablename__ = "tipos_transaccion"
+    
+    id = Column(Integer, primary_key=True, index=True)
+    nombre = Column(String(50), unique=True, nullable=False)  # ENTRADA, SALIDA
+    descripcion = Column(Text)
+    activo = Column(Boolean, default=True)
+    fecha_creacion = Column(DateTime, default=datetime.utcnow)
+    
+    # Relación
+    transacciones = relationship("Transaccion", back_populates="tipo_transaccion")
+
 class TipoLog(Base):
     __tablename__ = "tipos_log"
     
@@ -160,6 +172,8 @@ class Usuario(Base):
     estado_usuario = relationship("EstadoUsuario", back_populates="usuarios")
     ventas = relationship("Venta", back_populates="usuario")
     logs = relationship("Log", back_populates="usuario")
+    transacciones = relationship("Transaccion", back_populates="usuario")
+    compras = relationship("Compra", back_populates="usuario")
 
 class Empleado(Base):
     __tablename__ = "empleados"
@@ -208,6 +222,7 @@ class Producto(Base):
     estado_producto = relationship("EstadoProducto", back_populates="productos")
     inventarios = relationship("Inventario", back_populates="producto")
     detalle_ventas = relationship("DetalleVenta", back_populates="producto")
+    transacciones = relationship("Transaccion", back_populates="producto")
 
 class Inventario(Base):
     __tablename__ = "inventario"
@@ -269,6 +284,26 @@ class DetalleVenta(Base):
     venta = relationship("Venta", back_populates="detalle_ventas")
     producto = relationship("Producto", back_populates="detalle_ventas")
 
+class Compra(Base):
+    __tablename__ = "compras"
+
+    id = Column(Integer, primary_key=True, index=True)
+    numero_compra = Column(String(50), unique=True, nullable=True, index=True)
+    fecha_compra = Column(DateTime, default=datetime.utcnow)
+    proveedor_id = Column(Integer, nullable=True)  # Datos fake por ahora (sin FK)
+    tienda = Column(String(100), nullable=True)
+    subtotal = Column(Numeric(10, 2), default=0)
+    impuesto = Column(Numeric(10, 2), default=0)
+    descuento = Column(Numeric(10, 2), default=0)
+    total = Column(Numeric(10, 2), default=0)
+    usuario_id = Column(Integer, ForeignKey("usuarios.id"))
+    observaciones = Column(Text)
+    fecha_creacion = Column(DateTime, default=datetime.utcnow)
+    fecha_actualizacion = Column(DateTime, default=datetime.utcnow, onupdate=datetime.utcnow)
+
+    # Relaciones
+    usuario = relationship("Usuario", back_populates="compras")
+
 class Log(Base):
     """
     Tabla de logs del sistema - INMUTABLE
@@ -287,3 +322,26 @@ class Log(Base):
     # Relaciones
     tipo_log = relationship("TipoLog", back_populates="logs")
     usuario = relationship("Usuario", back_populates="logs")
+
+class Transaccion(Base):
+    """
+    Tabla de transacciones de inventario
+    Registra todas las entradas y salidas de productos
+    """
+    __tablename__ = "transacciones"
+    
+    id = Column(Integer, primary_key=True, index=True)
+    tipo_transaccion_id = Column(Integer, ForeignKey("tipos_transaccion.id"), nullable=False)
+    producto_id = Column(Integer, ForeignKey("productos.id"), nullable=False)
+    cantidad = Column(Numeric(10, 2), nullable=False)  # Siempre positiva
+    usuario_id = Column(Integer, ForeignKey("usuarios.id"), nullable=False)  # Quien registró
+    fecha = Column(DateTime, nullable=False, default=datetime.utcnow, index=True)  # Cuando ocurrió
+    observaciones = Column(Text, nullable=True)
+    compra_id = Column(Integer, nullable=True)  # FK futura a COMPRA
+    venta_id = Column(Integer, nullable=True)  # FK futura a VENTA
+    fecha_registro = Column(DateTime, default=datetime.utcnow, nullable=False)
+    
+    # Relaciones
+    tipo_transaccion = relationship("TipoTransaccion", back_populates="transacciones")
+    producto = relationship("Producto", back_populates="transacciones")
+    usuario = relationship("Usuario", back_populates="transacciones")

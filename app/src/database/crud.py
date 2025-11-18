@@ -149,18 +149,21 @@ class CRUDBase(Generic[ModelType, CreateSchemaType, UpdateSchemaType]):
         
         return query.count()
 
-    def create(self, db: Session, *, obj_in: CreateSchemaType) -> ModelType:
+    def create(self, db: Session, *, obj_in: CreateSchemaType | Dict[str, Any]) -> ModelType:
         """
         Crea un nuevo registro.
         
         Args:
             db: Sesión de base de datos
-            obj_in: Esquema Pydantic con los datos
+            obj_in: Esquema Pydantic con los datos o diccionario
             
         Returns:
             Registro creado
         """
-        obj_in_data = obj_in.dict() if hasattr(obj_in, 'dict') else obj_in.model_dump()
+        if isinstance(obj_in, dict):
+            obj_in_data = obj_in
+        else:
+            obj_in_data = obj_in.dict() if hasattr(obj_in, 'dict') else obj_in.model_dump()
         db_obj = self.model(**obj_in_data)
         db.add(db_obj)
         db.commit()
@@ -552,3 +555,193 @@ crud_tipo_log = CRUDBase[models.TipoLog, schemas.TipoLogCreate, schemas.TipoLogC
 
 # CRUD para Log (inmutable)
 crud_log = CRUDLog[models.Log, schemas.LogCreate, None](models.Log)
+
+# CRUD para productos
+crud_producto = CRUDBase[models.Producto, schemas.ProductoCreate, schemas.ProductoUpdate](models.Producto)
+crud_compra = CRUDBase[models.Compra, schemas.CompraCreate, schemas.CompraCreate](models.Compra)
+
+
+class CRUDTransaccion(CRUDBase[ModelType, CreateSchemaType, UpdateSchemaType]):
+    """
+    CRUD específico para transacciones de inventario
+    Incluye métodos especiales para consultas por producto y cálculo de stock
+    """
+    
+    def get_by_producto(
+        self,
+        db: Session,
+        producto_id: int,
+        skip: int = 0,
+        limit: int = 100
+    ) -> List[ModelType]:
+        """
+        Obtiene todas las transacciones de un producto específico
+        
+        Args:
+            db: Sesión de base de datos
+            producto_id: ID del producto
+            skip: Cantidad de registros a saltar (paginación)
+            limit: Cantidad máxima de registros a retornar
+        
+        Returns:
+            Lista de transacciones del producto
+        """
+        return (
+            db.query(self.model)
+            .filter(self.model.producto_id == producto_id)
+            .order_by(self.model.fecha.desc())
+            .offset(skip)
+            .limit(limit)
+            .all()
+        )
+    
+    def get_entradas(
+        self,
+        db: Session,
+        producto_id: Optional[int] = None,
+        skip: int = 0,
+        limit: int = 100
+    ) -> List[ModelType]:
+        """
+        Obtiene las transacciones de tipo ENTRADA
+        
+        Args:
+            db: Sesión de base de datos
+            producto_id: ID del producto (opcional, filtra por producto)
+            skip: Cantidad de registros a saltar
+            limit: Cantidad máxima de registros a retornar
+        
+        Returns:
+            Lista de transacciones de entrada
+        """
+        query = db.query(self.model).join(models.TipoTransaccion).filter(
+            models.TipoTransaccion.nombre == "ENTRADA"
+        )
+        
+        if producto_id:
+            query = query.filter(self.model.producto_id == producto_id)
+        
+        return (
+            query
+            .order_by(self.model.fecha.desc())
+            .offset(skip)
+            .limit(limit)
+            .all()
+        )
+    
+    def get_salidas(
+        self,
+        db: Session,
+        producto_id: Optional[int] = None,
+        skip: int = 0,
+        limit: int = 100
+    ) -> List[ModelType]:
+        """
+        Obtiene las transacciones de tipo SALIDA
+        
+        Args:
+            db: Sesión de base de datos
+            producto_id: ID del producto (opcional, filtra por producto)
+            skip: Cantidad de registros a saltar
+            limit: Cantidad máxima de registros a retornar
+        
+        Returns:
+            Lista de transacciones de salida
+        """
+        query = db.query(self.model).join(models.TipoTransaccion).filter(
+            models.TipoTransaccion.nombre == "SALIDA"
+        )
+        
+        if producto_id:
+            query = query.filter(self.model.producto_id == producto_id)
+        
+        return (
+            query
+            .order_by(self.model.fecha.desc())
+            .offset(skip)
+            .limit(limit)
+            .all()
+        )
+    
+    def calcular_stock_actual(self, db: Session, producto_id: int) -> float:
+        """
+        Calcula el stock actual de un producto basado en sus transacciones
+        
+        Fórmula: ENTRADAS - SALIDAS
+        
+        Args:
+            db: Sesión de base de datos
+            producto_id: ID del producto
+        
+        Returns:
+            Stock actual (puede ser negativo si hay más salidas que entradas)
+        """
+        from sqlalchemy import func
+        
+        # Calcular total de entradas
+        entradas = (
+            db.query(func.sum(self.model.cantidad))
+            .join(models.TipoTransaccion)
+            .filter(
+                and_(
+                    self.model.producto_id == producto_id,
+                    models.TipoTransaccion.nombre == "ENTRADA"
+                )
+            )
+            .scalar() or 0
+        )
+        
+        # Calcular total de salidas
+        salidas = (
+            db.query(func.sum(self.model.cantidad))
+            .join(models.TipoTransaccion)
+            .filter(
+                and_(
+                    self.model.producto_id == producto_id,
+                    models.TipoTransaccion.nombre == "SALIDA"
+                )
+            )
+            .scalar() or 0
+        )
+        
+        return float(entradas) - float(salidas)
+    
+    def get_productos_bajo_stock(
+        self,
+        db: Session,
+        limite_stock: int = 10
+    ) -> List[Dict[str, Any]]:
+        """
+        Obtiene productos cuyo stock actual está por debajo del límite
+        
+        Args:
+            db: Sesión de base de datos
+            limite_stock: Stock mínimo considerado "bajo"
+        
+        Returns:
+            Lista de diccionarios con producto_id, nombre y stock_actual
+        """
+        from sqlalchemy import func
+        
+        # Subconsulta para calcular stock por producto
+        productos = db.query(models.Producto).all()
+        productos_bajo_stock = []
+        
+        for producto in productos:
+            stock = self.calcular_stock_actual(db, producto.id)
+            if stock < limite_stock:
+                productos_bajo_stock.append({
+                    "producto_id": producto.id,
+                    "nombre": producto.nombre,
+                    "codigo": producto.codigo,
+                    "stock_actual": stock,
+                    "stock_minimo": producto.stock_minimo
+                })
+        
+        return sorted(productos_bajo_stock, key=lambda x: x["stock_actual"])
+
+
+# Instancia de CRUD para transacciones
+crud_tipo_transaccion = CRUDBase[models.TipoTransaccion, schemas.TipoTransaccionCreate, schemas.TipoTransaccionCreate](models.TipoTransaccion)
+crud_transaccion = CRUDTransaccion[models.Transaccion, schemas.TransaccionCreate, schemas.TransaccionCreate](models.Transaccion)
+

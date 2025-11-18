@@ -1,17 +1,19 @@
 # 📦 Sistema de Inventario
 
-Sistema de gestión de inventario con FastAPI, SQLAlchemy y Pydantic. Se aplicó la Fase 1 de mejoras: configuración centralizada, logging unificado, manejo global de errores y routers modularizados.
+Sistema de gestión de inventario con FastAPI, SQLAlchemy y Pydantic. Se aplicó la Fase 1 de mejoras: configuración centralizada, logging unificado, manejo global de errores y routers modularizados. Además, se incorporó el módulo de Transacciones e Inventario automático, y el módulo de Compras.
 
 ## 🚀 Características
 
 - ✅ Autenticación JWT y autorización por rol (admin/usuario)
 - ✅ Productos, Empresas y Usuarios con CRUD y validaciones
 - ✅ **Sistema de Logs inmutables** con auditoría completa y trazabilidad
+- ✅ **Transacciones (ENTRADA/SALIDA)** con actualización automática de `Inventario`
+- ✅ **Compras** como cabecera; items se registran como transacciones ENTRADA
 - ✅ Configuración centralizada con `pydantic-settings`
 - ✅ Logging por entorno (legible en dev, JSON en prod)
 - ✅ Handlers globales de errores (`HTTPException`, validación)
-- ✅ Routers modularizados: `system`, `auth`, `productos`, `empresas`, `usuarios`, `stats`, `logs`
-- ✅ Suite de tests (91) pasando - incluye 26 tests automatizados para logs
+- ✅ Routers modularizados: `system`, `auth`, `productos`, `empresas`, `usuarios`, `stats`, `logs`, `transacciones`, `compras`
+- ✅ Suite de tests (109) pasando (incluye pruebas de transacciones y compras)
 
 ## 🏗️ Arquitectura (resumen)
 
@@ -30,7 +32,9 @@ inventario/
 │       │   ├── empresas.py
 │       │   ├── usuarios.py
 │       │   ├── stats.py    # /stats
-│       │   └── logs.py     # /logs - Sistema de auditoría
+│       │   ├── logs.py     # /logs - Sistema de auditoría
+│       │   ├── transacciones.py # /transacciones - Movimientos de inventario
+│       │   └── compras.py       # /compras - Cabecera + items como ENTRADA
 │       ├── database/
 │       │   ├── database.py
 │       │   ├── models.py
@@ -91,7 +95,7 @@ API: <http://localhost:8000> • Docs: <http://localhost:8000/docs>
 - Desarrollo/Test: crea tablas automáticamente al iniciar.
 - Producción: no auto-crea tablas; se recomienda usar migraciones (Alembic).
 - Soporte: SQLite, PostgreSQL, MySQL.
-- **Nuevas tablas**: `tipos_log` y `logs` (inmutables para auditoría).
+- **Nuevas tablas**: `tipos_log`, `logs` (inmutables), `tipos_transaccion`, `transacciones`, `compras`.
 
 Detalles en `docs/database.md`.
 
@@ -105,9 +109,21 @@ Detalles en `docs/database.md`.
 
 Ver documentación completa en `docs/database.md` sección "Sistema de Logs y Auditoría" y `docs/api.md` sección "Endpoints de Logs".
 
+### 🔄 Transacciones e Inventario
+
+- Crear una transacción ENTRADA/SALIDA actualiza automáticamente el `Inventario` del producto.
+- Para SALIDA se valida que el stock sea suficiente (suma transacciones).
+- Endpoints clave: ver `docs/api.md` sección "Endpoints de Transacciones".
+
+### 🛒 Compras
+
+- Compras es una cabecera; los items se agregan en batch y se registran como transacciones ENTRADA con `compra_id`.
+- El inventario se crea si no existe y se incrementa por cada ítem.
+- Endpoints clave: ver `docs/api.md` sección "Endpoints de Compras".
+
 ## 🧪 Tests
 
-- Estado actual: **91 tests pasando** (61 originales + 26 tests de logs).
+- Estado actual: **109 tests pasando**.
 
 ```powershell
 pytest -q

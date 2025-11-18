@@ -469,6 +469,57 @@ class Venta(VentaBase):
     class Config:
         from_attributes = True
 
+class CompraBase(BaseModel):
+    numero_compra: Optional[str] = Field(None, min_length=1, max_length=50, description="Número de compra")
+    fecha_compra: datetime = Field(default_factory=datetime.utcnow, description="Fecha de la compra")
+    proveedor_id: Optional[int] = Field(None, gt=0, description="ID del proveedor (fake por ahora)")
+    tienda: Optional[str] = Field(None, max_length=100, description="Nombre/identificador de la tienda")
+    subtotal: Decimal = Field(0, ge=0, decimal_places=2, description="Subtotal de la compra")
+    impuesto: Decimal = Field(0, ge=0, decimal_places=2, description="Impuesto aplicado")
+    descuento: Decimal = Field(0, ge=0, decimal_places=2, description="Descuento aplicado")
+    total: Decimal = Field(0, ge=0, decimal_places=2, description="Total de la compra")
+    observaciones: Optional[str] = Field(None, max_length=1000, description="Observaciones de la compra")
+
+    @field_validator('numero_compra')
+    @classmethod
+    def validar_numero_compra(cls, v):
+        if v is None:
+            return v
+        import re as _re
+        if not _re.match(r'^[A-Za-z0-9\-_]+$', v):
+            raise ValueError('El número de compra debe contener solo letras, números, guiones y guiones bajos')
+        return v
+
+    @model_validator(mode='after')
+    def validar_total(self):
+        if self.subtotal is not None and self.impuesto is not None and self.descuento is not None:
+            total_calculado = self.subtotal + self.impuesto - self.descuento
+            if total_calculado < 0:
+                raise ValueError('El total no puede ser negativo')
+            self.total = total_calculado
+        return self
+
+class CompraCreate(CompraBase):
+    usuario_id: Optional[int] = Field(None, gt=0, description="Se completa desde el usuario autenticado")
+
+class Compra(CompraBase):
+    id: int
+    usuario_id: int
+    fecha_creacion: datetime
+    fecha_actualizacion: datetime
+    usuario: Optional[Usuario] = None
+
+    class Config:
+        from_attributes = True
+
+class CompraItemCreate(BaseModel):
+    producto_id: int = Field(..., gt=0)
+    cantidad: Decimal = Field(..., gt=0)
+    observaciones: Optional[str] = Field(None, max_length=500)
+
+class CompraAgregarItemsRequest(BaseModel):
+    items: List[CompraItemCreate] = Field(..., min_items=1)
+
 class TipoLogBase(BaseModel):
     nombre: str = Field(..., min_length=1, max_length=50, description="Nombre del tipo de log")
     descripcion: Optional[str] = Field(None, max_length=500, description="Descripción del tipo de log")
@@ -478,6 +529,21 @@ class TipoLogCreate(TipoLogBase):
     pass
 
 class TipoLog(TipoLogBase):
+    id: int
+    fecha_creacion: datetime
+
+    class Config:
+        from_attributes = True
+
+class TipoTransaccionBase(BaseModel):
+    nombre: str = Field(..., min_length=1, max_length=50, description="Nombre del tipo de transacción")
+    descripcion: Optional[str] = Field(None, max_length=500, description="Descripción del tipo")
+    activo: bool = Field(True, description="Estado activo del tipo")
+
+class TipoTransaccionCreate(TipoTransaccionBase):
+    pass
+
+class TipoTransaccion(TipoTransaccionBase):
     id: int
     fecha_creacion: datetime
 
@@ -523,6 +589,51 @@ class Log(LogBase):
 class LogListResponse(BaseModel):
     """Respuesta paginada para logs"""
     items: List[Log]
+    total: int
+    page: int
+    size: int
+    pages: int
+
+class TransaccionBase(BaseModel):
+    """
+    Esquema base para transacciones de inventario
+    Registra entradas y salidas de productos
+    """
+    tipo_transaccion_id: int = Field(..., gt=0, description="ID del tipo de transacción (ENTRADA/SALIDA)")
+    producto_id: int = Field(..., gt=0, description="ID del producto")
+    cantidad: Decimal = Field(..., gt=0, description="Cantidad (siempre positiva)")
+    fecha: datetime = Field(default_factory=datetime.utcnow, description="Fecha de la transacción")
+    observaciones: Optional[str] = Field(None, max_length=1000, description="Observaciones o motivo")
+    compra_id: Optional[int] = Field(None, gt=0, description="ID de la compra (si aplica)")
+    venta_id: Optional[int] = Field(None, gt=0, description="ID de la venta (si aplica)")
+
+    @field_validator('cantidad')
+    @classmethod
+    def validar_cantidad(cls, v):
+        """La cantidad debe ser mayor a 0"""
+        if v <= 0:
+            raise ValueError('La cantidad debe ser mayor a 0')
+        return v
+
+class TransaccionCreate(TransaccionBase):
+    """Schema para crear transacciones - usuario_id se toma del token"""
+    pass
+
+class Transaccion(TransaccionBase):
+    """Esquema de respuesta para transacciones"""
+    id: int
+    usuario_id: int
+    fecha_registro: datetime
+    tipo_transaccion: Optional[TipoTransaccion] = None
+    producto: Optional['Producto'] = None
+    usuario: Optional[Usuario] = None
+
+    class Config:
+        from_attributes = True
+
+class TransaccionListResponse(BaseModel):
+    """Respuesta paginada para transacciones"""
+    items: List[Transaccion]
     total: int
     page: int
     size: int

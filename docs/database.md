@@ -284,6 +284,68 @@ def endpoint(db: Session = Depends(get_db)):
 - `cantidad_disponible = cantidad_actual - cantidad_reservada`
 - `cantidad_reservada ≤ cantidad_actual`
 
+### Transaccion
+**Propósito**: Bitácora inmutable de movimientos de inventario (ENTRADA/SALIDA). Es el registro fuente para calcular stock histórico; además, su creación sincroniza el `Inventario` actual.
+
+| Campo | Tipo | Descripción | Restricciones |
+|-------|------|-------------|---------------|
+| `id` | Integer | Clave primaria | PRIMARY KEY, AUTO_INCREMENT |
+| `tipo_transaccion_id` | Integer | FK a `TipoTransaccion` | FOREIGN KEY, NOT NULL |
+| `producto_id` | Integer | FK a `Producto` | FOREIGN KEY, NOT NULL |
+| `cantidad` | Decimal(10,2) | Cantidad (siempre positiva) | NOT NULL, `> 0` |
+| `usuario_id` | Integer | FK a `Usuario` (quien registra) | FOREIGN KEY, NOT NULL |
+| `fecha` | DateTime | Fecha efectiva del movimiento | DEFAULT CURRENT_TIMESTAMP, INDEX |
+| `observaciones` | Text | Motivo/comentario | NULLABLE |
+| `compra_id` | Integer | Referencia a cabecera de compra (futura FK) | NULLABLE |
+| `venta_id` | Integer | Referencia a cabecera de venta (futura FK) | NULLABLE |
+| `fecha_registro` | DateTime | Timestamp de creación | DEFAULT CURRENT_TIMESTAMP |
+
+**Reglas de Negocio**:
+- `cantidad > 0` (validado por esquema)
+- Para `SALIDA` se valida stock suficiente previo a registrar
+- Al crear una transacción:
+    - ENTRADA: `inventario.cantidad_actual += cantidad`
+    - SALIDA: `inventario.cantidad_actual -= cantidad`
+    - `cantidad_disponible = cantidad_actual - cantidad_reservada`
+    - Se actualizan `fecha_ultima_entrada` o `fecha_ultima_salida` y `fecha_actualizacion`
+
+### TipoTransaccion
+**Propósito**: Catálogo de tipos disponibles para movimientos.
+
+| Campo | Tipo | Descripción | Restricciones |
+|-------|------|-------------|---------------|
+| `id` | Integer | Clave primaria | PRIMARY KEY, AUTO_INCREMENT |
+| `nombre` | String(50) | ENTRADA, SALIDA | UNIQUE, NOT NULL |
+| `descripcion` | Text | Descripción | NULLABLE |
+| `activo` | Boolean | Estado | DEFAULT TRUE |
+| `fecha_creacion` | DateTime | Creación | DEFAULT CURRENT_TIMESTAMP |
+
+**Valores recomendados**: `ENTRADA`, `SALIDA`.
+
+### Compra
+**Propósito**: Cabecera de compras; cada ítem de compra se registra como `Transaccion` de tipo ENTRADA asociada con `compra_id` y sincroniza el inventario.
+
+| Campo | Tipo | Descripción | Restricciones |
+|-------|------|-------------|---------------|
+| `id` | Integer | Clave primaria | PRIMARY KEY, AUTO_INCREMENT |
+| `numero_compra` | String(50) | Número de compra | UNIQUE, NULLABLE, INDEX |
+| `fecha_compra` | DateTime | Fecha de compra | DEFAULT CURRENT_TIMESTAMP |
+| `proveedor_id` | Integer | Identificador de proveedor (provisional, sin FK) | NULLABLE |
+| `tienda` | String(100) | Tienda/almacén | NULLABLE |
+| `subtotal` | Decimal(10,2) | Subtotal | DEFAULT 0 |
+| `impuesto` | Decimal(10,2) | Impuesto | DEFAULT 0 |
+| `descuento` | Decimal(10,2) | Descuento | DEFAULT 0 |
+| `total` | Decimal(10,2) | Total calculado | DEFAULT 0 |
+| `usuario_id` | Integer | FK a Usuario (creador) | FOREIGN KEY, NOT NULL |
+| `observaciones` | Text | Comentarios | NULLABLE |
+| `fecha_creacion` | DateTime | Creación | DEFAULT CURRENT_TIMESTAMP |
+| `fecha_actualizacion` | DateTime | Actualización | ON UPDATE CURRENT_TIMESTAMP |
+
+**Reglas de Negocio**:
+- `total = subtotal + impuesto - descuento` y `total >= 0`
+- Items se agregan vía endpoint batch y generan transacciones ENTRADA
+- Inventario se crea si no existe y se incrementa por cada ítem
+
 ### Venta
 **Propósito**: Registro de transacciones de venta.
 
@@ -387,6 +449,10 @@ EstadoEmpresa (1) ──── (N) Empresa
 EstadoEmpleado (1) ──── (N) Empleado
 
 EstadoVenta (1) ──── (N) Venta
+
+Compra (1) ──── (N) Transaccion (por `compra_id`)
+TipoTransaccion (1) ──── (N) Transaccion
+Transaccion (N) ──── (1) Producto | Usuario
 ```
 
 ### Relaciones Detalladas
@@ -852,10 +918,8 @@ logs_error = crud_log.get_by_tipo(db, tipo_log_id=tipo_error.id)
 
 ### Funcionalidades Adicionales
 1. **Historial de Cambios**: Tabla de auditoría para tracking completo
-2. **Compras**: Módulo de órdenes de compra y recepción
-3. **Reportes Avanzados**: Dashboard con métricas de negocio
-4. **API REST**: Endpoints completos con FastAPI
-5. **Notificaciones**: Sistema de alertas automáticas
+2. **Reportes Avanzados**: Dashboard con métricas de negocio
+3. **Notificaciones**: Sistema de alertas automáticas
 
 ### Optimizaciones
 1. **Particionado**: Para tablas de alto volumen (ventas, inventario)
@@ -876,7 +940,7 @@ logs_error = crud_log.get_by_tipo(db, tipo_log_id=tipo_error.id)
 Para más información sobre la implementación, consultar:
 - `app/src/database/models.py` - Modelos SQLAlchemy
 - `app/src/database/schemas.py` - Esquemas Pydantic  
-- `docs/api/` - Documentación de endpoints (próximamente)
+- `docs/api/` - Documentación de endpoints
 - `tests/` - Casos de prueba y ejemplos de uso
 
 ---

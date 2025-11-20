@@ -232,6 +232,48 @@ class Usuario(UsuarioBase):
     class Config:
         from_attributes = True
 
+class ClienteBase(BaseModel):
+    nombre: str = Field(..., min_length=1, max_length=100, description="Nombre del cliente")
+    apellido: str = Field(..., min_length=1, max_length=100, description="Apellido del cliente")
+    direccion: Optional[str] = Field(None, max_length=500, description="Dirección del cliente")
+    telefono: Optional[str] = Field(None, max_length=20, description="Teléfono del cliente")
+    descripcion: Optional[str] = Field(None, max_length=1000, description="Descripción del cliente")
+    identidad: str = Field(..., min_length=5, max_length=20, description="Documento de identidad")
+    email: Optional[EmailStr] = Field(None, description="Email del cliente")
+
+    @field_validator('identidad')
+    @classmethod
+    def validar_identidad(cls, v):
+        if not re.match(r'^[0-9A-Za-z\-]+$', v):
+            raise ValueError('La identidad debe contener solo números, letras y guiones')
+        return v
+
+    @field_validator('telefono')
+    @classmethod
+    def validar_telefono(cls, v):
+        if v and not re.match(r'^[\+0-9\-\s\(\)]+$', v):
+            raise ValueError('Formato de teléfono inválido')
+        return v
+
+class ClienteCreate(ClienteBase):
+    pass
+
+class ClienteUpdate(BaseModel):
+    nombre: Optional[str] = Field(None, min_length=1, max_length=100)
+    apellido: Optional[str] = Field(None, min_length=1, max_length=100)
+    direccion: Optional[str] = Field(None, max_length=500)
+    telefono: Optional[str] = Field(None, max_length=20)
+    descripcion: Optional[str] = Field(None, max_length=1000)
+    email: Optional[EmailStr] = None
+
+class Cliente(ClienteBase):
+    id: int
+    fecha_creacion: datetime
+    fecha_actualizacion: datetime
+
+    class Config:
+        from_attributes = True
+
 class EmpleadoBase(BaseModel):
     codigo_empleado: str = Field(..., min_length=1, max_length=20, description="Código único del empleado")
     nombre: str = Field(..., min_length=1, max_length=100, description="Nombre del empleado")
@@ -414,47 +456,27 @@ class DetalleVenta(DetalleVentaBase):
         from_attributes = True
 
 class VentaBase(BaseModel):
-    numero_venta: str = Field(..., min_length=1, max_length=50, description="Número de venta")
-    cliente_nombre: str = Field(..., min_length=1, max_length=200, description="Nombre del cliente")
-    cliente_documento: Optional[str] = Field(None, max_length=20, description="Documento del cliente")
-    cliente_telefono: Optional[str] = Field(None, max_length=20, description="Teléfono del cliente")
-    cliente_email: Optional[EmailStr] = Field(None, description="Email del cliente")
-    cliente_direccion: Optional[str] = Field(None, max_length=500, description="Dirección del cliente")
-    subtotal: Decimal = Field(..., ge=0, decimal_places=2, description="Subtotal de la venta")
-    impuesto: Decimal = Field(0, ge=0, decimal_places=2, description="Impuesto aplicado")
-    descuento: Decimal = Field(0, ge=0, decimal_places=2, description="Descuento aplicado")
-    total: Decimal = Field(..., gt=0, decimal_places=2, description="Total de la venta")
-    fecha_venta: datetime = Field(default_factory=datetime.utcnow, description="Fecha de la venta")
-    usuario_id: int = Field(..., gt=0, description="ID del usuario que registra la venta")
+    factura_id: str = Field(..., min_length=1, max_length=50, description="Número de factura")
+    cliente_id: int = Field(..., gt=0, description="ID del cliente")
+    fecha: datetime = Field(default_factory=datetime.utcnow, description="Fecha de la venta")
+    valor_total: Decimal = Field(..., gt=0, decimal_places=2, description="Valor total de la venta")
+    vendedor_id: int = Field(..., gt=0, description="ID del vendedor")
     estado_venta_id: int = Field(..., gt=0, description="ID del estado de la venta")
     observaciones: Optional[str] = Field(None, max_length=1000, description="Observaciones de la venta")
 
-    @field_validator('numero_venta')
+    @field_validator('factura_id')
     @classmethod
-    def validar_numero_venta(cls, v):
+    def validar_factura_id(cls, v):
         if not re.match(r'^[A-Za-z0-9\-_]+$', v):
-            raise ValueError('El número de venta debe contener solo letras, números, guiones y guiones bajos')
+            raise ValueError('El ID de factura debe contener solo letras, números, guiones y guiones bajos')
         return v
 
-    @model_validator(mode='after')
-    def validar_total(self):
-        if self.subtotal:
-            total_calculado = self.subtotal + self.impuesto - self.descuento
-            if total_calculado < 0:
-                raise ValueError('El total no puede ser negativo')
-            self.total = total_calculado
-        
-        return self
-
 class VentaCreate(VentaBase):
+    vendedor_id: Optional[int] = Field(None, gt=0, description="ID del vendedor (se completa automáticamente)")
     detalle_ventas: List[DetalleVentaCreate] = Field(..., min_items=1, description="Detalles de la venta")
 
 class VentaUpdate(BaseModel):
-    cliente_nombre: Optional[str] = Field(None, min_length=1, max_length=200)
-    cliente_documento: Optional[str] = Field(None, max_length=20)
-    cliente_telefono: Optional[str] = Field(None, max_length=20)
-    cliente_email: Optional[EmailStr] = None
-    cliente_direccion: Optional[str] = Field(None, max_length=500)
+    cliente_id: Optional[int] = Field(None, gt=0)
     estado_venta_id: Optional[int] = Field(None, gt=0)
     observaciones: Optional[str] = Field(None, max_length=1000)
 
@@ -462,7 +484,8 @@ class Venta(VentaBase):
     id: int
     fecha_creacion: datetime
     fecha_actualizacion: datetime
-    usuario: Optional[Usuario] = None
+    cliente: Optional[Cliente] = None
+    vendedor: Optional[Usuario] = None
     estado_venta: Optional[EstadoVenta] = None
     detalle_ventas: List[DetalleVenta] = []
 

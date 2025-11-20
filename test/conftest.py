@@ -11,7 +11,7 @@ from sqlalchemy.orm import sessionmaker
 sys.path.insert(0, os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
 
 from app.src.database.models import Base
-from app.src.database.models import TipoUsuario, EstadoUsuario, TipoProducto, EstadoProducto
+from app.src.database.models import Base, TipoUsuario, EstadoUsuario, TipoProducto, EstadoProducto, Usuario
 from app.src.database import crud, schemas
 from app.src.auth import crud_usuario
 from decimal import Decimal
@@ -111,3 +111,40 @@ def tipo_producto(db):
 def estado_producto(db):
     """Fixture para obtener estado de producto"""
     return db.query(EstadoProducto).first()
+
+
+@pytest.fixture(scope="session")
+def client():
+    """Cliente de prueba para FastAPI"""
+    from fastapi.testclient import TestClient
+    from app.main import app
+    return TestClient(app)
+
+
+@pytest.fixture(scope="function")
+def test_user_token(client, db):
+    """Token de autenticación para usuario de prueba"""
+    from app.src.auth.password import PasswordHandler
+    
+    # Crear usuario de prueba si no existe
+    usuario = db.query(Usuario).filter(Usuario.username == "testuser").first()
+    if not usuario:
+        password_handler = PasswordHandler()
+        usuario_data = schemas.UsuarioCreate(
+            username="testuser",
+            email="test@test.com",
+            password="testpass123",
+            nombre="Test",
+            apellido="User",
+            tipo_usuario_id=2,
+            estado_usuario_id=1
+        )
+        usuario = crud_usuario.create(db, obj_in=usuario_data)
+        db.commit()
+    
+    # Login para obtener token
+    login_data = {"email": "test@test.com", "password": "testpass123"}
+    response = client.post("/auth/login", json=login_data)
+    assert response.status_code == 200
+    token = response.json()["access_token"]
+    return {"Authorization": f"Bearer {token}"}

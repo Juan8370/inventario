@@ -29,6 +29,7 @@ Todos los endpoints devuelven códigos de estado HTTP correctos (200/201/400/401
 ### Descripción General
 
 El sistema utiliza:
+
 - **JWT (JSON Web Tokens)** para gestión de sesiones
 - **bcrypt** para hash seguro de contraseñas
 - **FastAPI dependencies** para proteger endpoints
@@ -42,6 +43,7 @@ ACCESS_TOKEN_EXPIRE_MINUTES=1440
 ```
 
 Generar clave secreta:
+
 ```bash
 openssl rand -hex 32
 ```
@@ -51,11 +53,13 @@ openssl rand -hex 32
 En modo desarrollo (`ENVIRONMENT=development`), se crea automáticamente un usuario administrador:
 
 **Credenciales:**
+
 - **Username**: `admin`
 - **Email**: `admin@ejemplo.com`
 - **Password**: `admin123`
 
 **Uso:**
+
 ```bash
 curl -X POST "http://localhost:8000/auth/login" \
   -H "Content-Type: application/json" \
@@ -71,6 +75,7 @@ curl -X POST "http://localhost:8000/auth/login" \
 Autentica usuario y retorna token JWT.
 
 **Request:**
+
 ```json
 {
   "email": "usuario@ejemplo.com",
@@ -79,6 +84,7 @@ Autentica usuario y retorna token JWT.
 ```
 
 **Response (200 OK):**
+
 ```json
 {
   "access_token": "eyJ0eXAiOiJKV1QiLCJhbGc...",
@@ -91,6 +97,7 @@ Autentica usuario y retorna token JWT.
 ```
 
 **Errores:**
+
 - `401 Unauthorized`: Email o contraseña incorrectos
 - `403 Forbidden`: Usuario inactivo
 
@@ -101,11 +108,13 @@ Autentica usuario y retorna token JWT.
 Retorna información del usuario autenticado.
 
 **Headers:**
-```
+
+```text
 Authorization: Bearer <token>
 ```
 
 **Response (200 OK):**
+
 ```json
 {
   "id": 1,
@@ -123,11 +132,13 @@ Authorization: Bearer <token>
 Cambia la contraseña del usuario autenticado.
 
 **Headers:**
-```
+
+```text
 Authorization: Bearer <token>
 ```
 
 **Request:**
+
 ```json
 {
   "current_password": "password_actual",
@@ -136,6 +147,7 @@ Authorization: Bearer <token>
 ```
 
 **Response (200 OK):**
+
 ```json
 {
   "message": "Contraseña actualizada exitosamente"
@@ -143,10 +155,12 @@ Authorization: Bearer <token>
 ```
 
 **Errores:**
+
 - `400 Bad Request`: Contraseña actual incorrecta
 - `401 Unauthorized`: Token inválido
 
 **Validaciones de Contraseña:**
+
 - Mínimo 8 caracteres
 - Al menos una letra
 - Al menos un número
@@ -154,6 +168,7 @@ Authorization: Bearer <token>
 ### Estructura del Token JWT
 
 El token contiene:
+
 ```json
 {
   "user_id": 1,
@@ -175,6 +190,7 @@ El token contiene:
 Retorna información general de la API.
 
 **Response (200 OK):**
+
 ```json
 {
   "message": "Bienvenido al Sistema de Inventario",
@@ -191,6 +207,7 @@ Retorna información general de la API.
 Verifica estado de la aplicación y conexión a base de datos.
 
 **Response (200 OK):**
+
 ```json
 {
   "status": "OK",
@@ -201,6 +218,7 @@ Verifica estado de la aplicación y conexión a base de datos.
 ```
 
 **Response (503 Service Unavailable):**
+
 ```json
 {
   "detail": "Error de conexión con la base de datos"
@@ -214,6 +232,7 @@ Verifica estado de la aplicación y conexión a base de datos.
 Retorna información sobre la base de datos (sin credenciales).
 
 **Response (200 OK):**
+
 ```json
 {
   "database_url": "sqlite:///./inventario.db",
@@ -229,6 +248,7 @@ Retorna información sobre la base de datos (sin credenciales).
 Retorna estadísticas del sistema. Requiere encabezado `Authorization: Bearer <token>`.
 
 **Response (200 OK):**
+
 ```json
 {
   "total_productos": 150,
@@ -250,10 +270,12 @@ Retorna estadísticas del sistema. Requiere encabezado `Authorization: Bearer <t
 Lista productos con paginación.
 
 **Query Parameters:**
+
 - `skip` (int): Registros a saltar (≥ 0)
 - `limit` (int): Registros a retornar (≥ 1)
 
 **Response (200 OK):**
+
 ```json
 [
   {
@@ -274,6 +296,7 @@ Lista productos con paginación.
 ```
 
 **Errores:**
+
 - `422 Unprocessable Entity`: Si `skip < 0` o `limit < 1`
 
 ### Obtener Producto
@@ -283,6 +306,7 @@ Lista productos con paginación.
 Obtiene un producto específico por ID.
 
 **Response (200 OK):**
+
 ```json
 {
   "id": 1,
@@ -293,6 +317,7 @@ Obtiene un producto específico por ID.
 ```
 
 **Errores:**
+
 - `404 Not Found`: Producto no existe
 
 ### Crear Producto
@@ -302,6 +327,7 @@ Obtiene un producto específico por ID.
 Crea un nuevo producto.
 
 **Request:**
+
 ```json
 {
   "codigo": "PROD-001",
@@ -319,6 +345,7 @@ Crea un nuevo producto.
 ```
 
 **Response (201 Created):**
+
 ```json
 {
   "id": 1,
@@ -328,6 +355,7 @@ Crea un nuevo producto.
 ```
 
 **Errores:**
+
 - `400 Bad Request`: Código duplicado
 - `422 Unprocessable Entity`: Datos inválidos
 
@@ -338,6 +366,7 @@ Crea un nuevo producto.
 Actualiza un producto existente (actualización parcial permitida).
 
 **Request:**
+
 ```json
 {
   "nombre": "Producto Actualizado",
@@ -346,6 +375,7 @@ Actualiza un producto existente (actualización parcial permitida).
 ```
 
 **Response (200 OK):**
+
 ```json
 {
   "id": 1,
@@ -356,6 +386,7 @@ Actualiza un producto existente (actualización parcial permitida).
 ```
 
 **Errores:**
+
 - `404 Not Found`: Producto no existe
 
 ### Eliminar Producto
@@ -365,6 +396,7 @@ Actualiza un producto existente (actualización parcial permitida).
 Elimina un producto.
 
 **Response (200 OK):**
+
 ```json
 {
   "message": "Producto eliminado exitosamente"
@@ -372,6 +404,7 @@ Elimina un producto.
 ```
 
 **Errores:**
+
 - `404 Not Found`: Producto no existe
 
 ### Buscar Productos
@@ -381,12 +414,14 @@ Elimina un producto.
 Busca productos por término en múltiples campos.
 
 **Búsqueda en:**
+
 - `nombre`
 - `codigo`
 - `descripcion`
 - `marca`
 
 **Response (200 OK):**
+
 ```json
 [
   {
@@ -409,6 +444,7 @@ Busca productos por término en múltiples campos.
 Lista empresas con paginación.
 
 **Response (200 OK):**
+
 ```json
 [
   {
@@ -432,6 +468,7 @@ Lista empresas con paginación.
 Crea una nueva empresa.
 
 **Request:**
+
 ```json
 {
   "nombre": "Empresa Test S.A.",
@@ -446,6 +483,7 @@ Crea una nueva empresa.
 ```
 
 **Response (201 Created):**
+
 ```json
 {
   "id": 1,
@@ -455,6 +493,7 @@ Crea una nueva empresa.
 ```
 
 **Errores:**
+
 - `400 Bad Request`: RUC duplicado
 - `422 Unprocessable Entity`: Datos inválidos
 
@@ -471,6 +510,7 @@ Las transacciones registran movimientos de inventario (ENTRADA/SALIDA) y actuali
 Requiere autenticación. Actualiza inventario según tipo.
 
 **Request:**
+
 ```json
 {
   "tipo_transaccion_id": 1,  
@@ -484,6 +524,7 @@ Requiere autenticación. Actualiza inventario según tipo.
 ```
 
 **Response (201 Created):**
+
 ```json
 {
   "id": 1,
@@ -500,6 +541,7 @@ Requiere autenticación. Actualiza inventario según tipo.
 ```
 
 **Errores:**
+
 - `404 Not Found`: Producto o tipo de transacción no existe
 - `400 Bad Request`: Stock insuficiente para SALIDA
 - `422 Unprocessable Entity`: Datos inválidos
@@ -521,6 +563,7 @@ Paginado simple.
 Calcula stock con: `stock_actual = SUM(ENTRADAS) - SUM(SALIDAS)`.
 
 **Response (200 OK):**
+
 ```json
 {
   "producto_id": 123,
@@ -559,6 +602,7 @@ Compras funciona como cabecera; las líneas se registran como transacciones de t
 Requiere autenticación; el `usuario_id` se toma del token. El total se recalcula: `total = subtotal + impuesto - descuento (>= 0)`.
 
 **Request:**
+
 ```json
 {
   "numero_compra": "C-0001",
@@ -572,6 +616,7 @@ Requiere autenticación; el `usuario_id` se toma del token. El total se recalcul
 ```
 
 **Response (201 Created):**
+
 ```json
 {
   "id": 1,
@@ -606,6 +651,7 @@ Campos de filtro admitidos: `proveedor_id`, `fecha_compra (gte/lte)`, `numero_co
 Cada item genera una transacción ENTRADA con `compra_id` y actualiza inventario del producto.
 
 **Request:**
+
 ```json
 {
   "items": [
@@ -616,6 +662,7 @@ Cada item genera una transacción ENTRADA con `compra_id` y actualiza inventario
 ```
 
 **Response (201 Created):**
+
 ```json
 [
   {
@@ -651,6 +698,149 @@ Cada item genera una transacción ENTRADA con `compra_id` y actualiza inventario
 
 ---
 
+## Endpoints de Ventas
+
+Las ventas registran la salida de productos, generan transacciones de tipo SALIDA automáticamente y descuentan el stock del inventario.
+
+### Crear Venta
+
+**POST** `/ventas/`
+
+Crea una nueva venta con sus detalles. Requiere autenticación.
+
+**Proceso Interno:**
+
+1. Verifica existencia de cliente y estado de venta.
+2. Crea la cabecera de la venta.
+3. Por cada detalle:
+   - Verifica existencia del producto.
+   - Valida stock suficiente en inventario.
+   - Crea registro en `detalle_ventas`.
+   - Crea transacción de tipo `SALIDA`.
+   - Descuenta la cantidad del inventario.
+4. Registra log de la operación.
+
+**Request:**
+
+```json
+{
+  "factura_id": "F-001-0001",
+  "cliente_id": 1,
+  "fecha": "2025-11-20T15:30:00",
+  "valor_total": 150.00,
+  "estado_venta_id": 1,
+  "observaciones": "Venta al contado",
+  "detalle_ventas": [
+    {
+      "producto_id": 10,
+      "cantidad": 2,
+      "precio_unitario": 50.00,
+      "descuento_unitario": 0.00,
+      "subtotal": 100.00
+    },
+    {
+      "producto_id": 15,
+      "cantidad": 1,
+      "precio_unitario": 50.00,
+      "descuento_unitario": 0.00,
+      "subtotal": 50.00
+    }
+  ]
+}
+```
+
+**Response (201 Created):**
+
+```json
+{
+  "id": 1,
+  "factura_id": "F-001-0001",
+  "cliente_id": 1,
+  "vendedor_id": 5,
+  "fecha": "2025-11-20T15:30:00",
+  "valor_total": 150.0,
+  "estado_venta_id": 1,
+  "observaciones": "Venta al contado",
+  "fecha_creacion": "2025-11-20T15:30:05",
+  "fecha_actualizacion": "2025-11-20T15:30:05",
+  "detalle_ventas": [...]
+}
+```
+
+**Errores:**
+
+- `404 Not Found`: Cliente, estado de venta o producto no encontrado.
+- `400 Bad Request`: Stock insuficiente para algún producto.
+
+### Listar Ventas
+
+**GET** `/ventas/`
+
+Lista ventas con filtros opcionales.
+
+**Query Parameters:**
+
+- `cliente_id` (int): Filtrar por cliente.
+- `fecha_desde` (datetime): Ventas desde esta fecha.
+- `fecha_hasta` (datetime): Ventas hasta esta fecha.
+- `factura_id` (str): Filtrar por número de factura.
+- `skip` (int): Paginación.
+- `limit` (int): Paginación.
+
+**Response (200 OK):**
+
+```json
+[
+  {
+    "id": 1,
+    "factura_id": "F-001-0001",
+    "valor_total": 150.0,
+    "fecha": "2025-11-20T15:30:00",
+    ...
+  }
+]
+```
+
+### Obtener Venta
+
+**GET** `/ventas/{venta_id}`
+
+Obtiene una venta específica por su ID.
+
+**Response (200 OK):**
+
+```json
+{
+  "id": 1,
+  "factura_id": "F-001-0001",
+  ...
+}
+```
+
+### Listar Detalles de Venta
+
+**GET** `/ventas/{venta_id}/detalles`
+
+Lista los productos (detalles) asociados a una venta específica.
+
+**Response (200 OK):**
+
+```json
+[
+  {
+    "id": 10,
+    "venta_id": 1,
+    "producto_id": 10,
+    "cantidad": 2,
+    "precio_unitario": 50.0,
+    "subtotal": 100.0
+  },
+  ...
+]
+```
+
+---
+
 ## Endpoints de Logs
 
 El sistema de logs proporciona auditoría y trazabilidad inmutable de todas las acciones del sistema.
@@ -670,6 +860,7 @@ Lista logs según permisos del usuario actual.
 **Autenticación requerida**: Sí (Usuario o Admin)
 
 **Response (200 OK):**
+
 ```json
 [
   {
@@ -702,6 +893,7 @@ Obtiene solo los logs del usuario actual.
 **Autenticación requerida**: Sí (Usuario)
 
 **Response (200 OK):**
+
 ```json
 [
   {
@@ -724,6 +916,7 @@ Obtiene logs del sistema (invisibles para usuarios normales).
 **Autenticación requerida**: Sí (Solo Admin)
 
 **Response (200 OK):**
+
 ```json
 [
   {
@@ -749,6 +942,7 @@ Obtiene un log por su ID (con validación de permisos).
 **Autenticación requerida**: Sí (Usuario o Admin)
 
 **Response (200 OK):**
+
 ```json
 {
   "id": 1,
@@ -773,6 +967,7 @@ Crea un log manualmente (solo admin).
 **Autenticación requerida**: Sí (Solo Admin)
 
 **Request:**
+
 ```json
 {
   "descripcion": "Mantenimiento del sistema realizado",
@@ -807,6 +1002,7 @@ Lista todos los tipos de log disponibles.
 **Autenticación requerida**: Sí (Usuario)
 
 **Response (200 OK):**
+
 ```json
 [
   {
@@ -852,19 +1048,23 @@ Lista todos los tipos de log disponibles.
 El sistema registra automáticamente los siguientes eventos:
 
 **Autenticación:**
+
 - ✅ Login exitoso → `LOGIN`
 - ✅ Intento de login fallido → `ERROR`
 
 **Productos:**
+
 - ✅ Crear producto → `INFO`
 - ✅ Actualizar producto → `INFO`
 - ✅ Eliminar producto → `INFO`
 
 **Usuarios:**
+
 - ✅ Crear usuario → `SIGNUP` + `INFO`
 - ✅ Cambiar contraseña → `INFO`
 
 **Empresas:**
+
 - ✅ Crear empresa → `INFO`
 
 ---
@@ -1127,6 +1327,7 @@ def change_password(
 ### Serialización de Datos
 
 - **Precios**: Se serializan como números (no strings)
+
   ```json
   {
     "precio_compra": 800.0,
@@ -1155,7 +1356,7 @@ def change_password(
 
 ## Flujo de Autenticación
 
-```
+```text
 1. Cliente → POST /auth/login {email, password}
 2. Servidor → Verifica credenciales en BD
 3. Servidor → Genera token JWT
@@ -1191,14 +1392,17 @@ def change_password(
 ## Troubleshooting
 
 ### Error: "Could not validate credentials"
+
 - Verificar que el token esté en el header `Authorization: Bearer <token>`
 - Verificar que el token no haya expirado
 - Verificar que la `SECRET_KEY` sea la correcta
 
 ### Error: "User inactive"
+
 - El usuario existe pero su estado está inactivo
 - Verificar `estado_usuario.activo = True` en la base de datos
 
 ### Error: "Incorrect email or password"
+
 - Las credenciales son incorrectas
 - Verificar que el email y password sean correctos

@@ -15,7 +15,7 @@ from app.src.database.models import (
     TipoEmpresa, EstadoEmpresa, Empresa,
     EstadoEmpleado, Empleado,
     EstadoVenta, Venta, DetalleVenta,
-    Inventario
+    Inventario, Cliente
 )
 
 
@@ -91,10 +91,8 @@ class TestDatabaseStructure:
         # Verificar estructura de tabla ventas
         ventas_columns = {col['name'] for col in inspector.get_columns('ventas')}
         expected_ventas_columns = {
-            'id', 'numero_venta', 'cliente_nombre', 'cliente_documento',
-            'cliente_telefono', 'cliente_email', 'cliente_direccion',
-            'subtotal', 'impuesto', 'descuento', 'total', 'fecha_venta',
-            'usuario_id', 'estado_venta_id', 'observaciones',
+            'id', 'factura_id', 'cliente_id', 'fecha', 'valor_total',
+            'vendedor_id', 'estado_venta_id', 'observaciones',
             'fecha_creacion', 'fecha_actualizacion'
         }
         assert expected_ventas_columns.issubset(ventas_columns)
@@ -121,7 +119,7 @@ class TestDatabaseStructure:
         # Verificar FKs en tabla ventas
         ventas_fks = inspector.get_foreign_keys('ventas')
         fk_columns = {fk['constrained_columns'][0] for fk in ventas_fks}
-        expected_fks = {'usuario_id', 'estado_venta_id'}
+        expected_fks = {'cliente_id', 'vendedor_id', 'estado_venta_id'}
         assert expected_fks.issubset(fk_columns)
         
         # Verificar FKs en tabla detalle_ventas
@@ -312,19 +310,25 @@ class TestDatabaseOperations:
         session.add(estado_venta)
         session.commit()
         
+        # Crear cliente
+        cliente = Cliente(
+            nombre="Cliente",
+            apellido="Test",
+            identidad="12345678",
+            telefono="555-9999",
+            email="cliente@test.com",
+            direccion="Dirección Test"
+        )
+        session.add(cliente)
+        session.commit()
+        
         # Crear venta
         venta = Venta(
-            numero_venta="V-2024-001",
-            cliente_nombre="Cliente Test",
-            cliente_documento="12345678",
-            cliente_telefono="555-9999",
-            cliente_email="cliente@test.com",
-            subtotal=1000.00,
-            impuesto=180.00,
-            descuento=0.00,
-            total=1180.00,
-            fecha_venta=datetime.utcnow(),
-            usuario_id=usuario.id,
+            factura_id="V-2024-001",
+            cliente_id=cliente.id,
+            fecha=datetime.utcnow(),
+            valor_total=1180.00,
+            vendedor_id=usuario.id,
             estado_venta_id=estado_venta.id,
             observaciones="Venta de prueba"
         )
@@ -345,9 +349,10 @@ class TestDatabaseOperations:
         
         # Verificar la venta completa
         created_venta = session.query(Venta).first()
-        assert created_venta.numero_venta == "V-2024-001"
-        assert created_venta.total == 1180.00
-        assert created_venta.usuario.username == "admin"
+        assert created_venta.factura_id == "V-2024-001"
+        assert created_venta.valor_total == 1180.00
+        assert created_venta.vendedor.username == "admin"
+        assert created_venta.cliente.nombre == "Cliente"
         assert len(created_venta.detalle_ventas) == 1
         assert created_venta.detalle_ventas[0].producto.codigo == "PROD-001"
         

@@ -346,39 +346,50 @@ def endpoint(db: Session = Depends(get_db)):
 - Items se agregan vía endpoint batch y generan transacciones ENTRADA
 - Inventario se crea si no existe y se incrementa por cada ítem
 
+### Cliente
+
+**Propósito**: Gestión de la cartera de clientes.
+
+| Campo | Tipo | Descripción | Restricciones |
+|-------|------|-------------|---------------|
+| `id` | Integer | Clave primaria | PRIMARY KEY, AUTO_INCREMENT |
+| `nombre` | String(100) | Nombre del cliente | NOT NULL |
+| `apellido` | String(100) | Apellido del cliente | NOT NULL |
+| `identidad` | String(20) | Documento de identidad | UNIQUE, NOT NULL |
+| `email` | String(100) | Correo electrónico | NULLABLE |
+| `telefono` | String(20) | Teléfono de contacto | NULLABLE |
+| `direccion` | Text | Dirección física | NULLABLE |
+| `descripcion` | Text | Notas adicionales | NULLABLE |
+| `fecha_creacion` | DateTime | Timestamp de creación | DEFAULT CURRENT_TIMESTAMP |
+| `fecha_actualizacion` | DateTime | Última actualización | ON UPDATE CURRENT_TIMESTAMP |
+
+**Relaciones**:
+
+- `ventas`: Relación 1:N con tabla Venta.
+
 ### Venta
+
 **Propósito**: Registro de transacciones de venta.
 
 | Campo | Tipo | Descripción | Restricciones |
 |-------|------|-------------|---------------|
 | `id` | Integer | Clave primaria | PRIMARY KEY, AUTO_INCREMENT |
-| `numero_venta` | String(50) | Número de factura | UNIQUE, NOT NULL, INDEX |
-| `cliente_nombre` | String(200) | Nombre del cliente | NOT NULL |
-| `cliente_documento` | String(20) | Documento del cliente | NULLABLE |
-| `cliente_telefono` | String(20) | Teléfono del cliente | NULLABLE |
-| `cliente_email` | String(100) | Email del cliente | NULLABLE |
-| `cliente_direccion` | Text | Dirección de entrega | NULLABLE |
-| `subtotal` | Decimal(10,2) | Suma sin impuestos | NOT NULL |
-| `impuesto` | Decimal(10,2) | Impuestos aplicados | DEFAULT 0 |
-| `descuento` | Decimal(10,2) | Descuentos aplicados | DEFAULT 0 |
-| `total` | Decimal(10,2) | Monto final | NOT NULL |
-| `fecha_venta` | DateTime | Fecha de transacción | DEFAULT CURRENT_TIMESTAMP |
-| `usuario_id` | Integer | FK a Usuario | FOREIGN KEY, NOT NULL |
+| `factura_id` | String(50) | Número de factura | UNIQUE, NOT NULL, INDEX |
+| `cliente_id` | Integer | FK a Cliente | FOREIGN KEY, NOT NULL |
+| `vendedor_id` | Integer | FK a Usuario | FOREIGN KEY, NOT NULL |
+| `fecha` | DateTime | Fecha de transacción | DEFAULT CURRENT_TIMESTAMP |
+| `valor_total` | Numeric(10,2) | Monto total de la venta | NOT NULL |
 | `estado_venta_id` | Integer | FK a EstadoVenta | FOREIGN KEY, NOT NULL |
 | `observaciones` | Text | Notas adicionales | NULLABLE |
 | `fecha_creacion` | DateTime | Timestamp de creación | DEFAULT CURRENT_TIMESTAMP |
 | `fecha_actualizacion` | DateTime | Última actualización | ON UPDATE CURRENT_TIMESTAMP |
 
-**Reglas de Negocio**:
-- `total = subtotal + impuesto - descuento`
-- `total > 0`
-
 **Índices**:
-- `idx_venta_numero` (numero_venta)
-- `idx_venta_fecha` (fecha_venta)
-- `idx_venta_cliente` (cliente_nombre)
+
+- `idx_venta_factura_id` (factura_id)
 
 ### DetalleVenta
+
 **Propósito**: Líneas individuales de cada venta.
 
 | Campo | Tipo | Descripción | Restricciones |
@@ -387,16 +398,17 @@ def endpoint(db: Session = Depends(get_db)):
 | `venta_id` | Integer | FK a Venta | FOREIGN KEY, NOT NULL |
 | `producto_id` | Integer | FK a Producto | FOREIGN KEY, NOT NULL |
 | `cantidad` | Integer | Unidades vendidas | NOT NULL |
-| `precio_unitario` | Decimal(10,2) | Precio por unidad | NOT NULL |
-| `descuento_unitario` | Decimal(10,2) | Descuento por unidad | DEFAULT 0 |
-| `subtotal` | Decimal(10,2) | Total de la línea | NOT NULL |
+| `precio_unitario` | Numeric(10,2) | Precio por unidad | NOT NULL |
+| `descuento_unitario` | Numeric(10,2) | Descuento por unidad | DEFAULT 0 |
+| `subtotal` | Numeric(10,2) | Total de la línea | NOT NULL |
 | `fecha_creacion` | DateTime | Timestamp de creación | DEFAULT CURRENT_TIMESTAMP |
 
 **Reglas de Negocio**:
+
 - `subtotal = (precio_unitario - descuento_unitario) * cantidad`
-- `cantidad > 0`
 
 ### Log ⚠️ INMUTABLE
+
 **Propósito**: Registro de auditoría de todas las acciones del sistema. **Los logs NO pueden ser modificados ni eliminados una vez creados**.
 
 | Campo | Tipo | Descripción | Restricciones |
@@ -409,16 +421,19 @@ def endpoint(db: Session = Depends(get_db)):
 | `fecha` | DateTime | Timestamp del log | DEFAULT CURRENT_TIMESTAMP, INDEX |
 
 **Reglas de Inmutabilidad**:
+
 - ✅ **CREATE**: Permitido para admin y sistema
 - ❌ **UPDATE**: Bloqueado (HTTP 403)
 - ❌ **DELETE**: Bloqueado (HTTP 403)
 - 🔍 **READ**: Según permisos de visibilidad
 
 **Reglas de Visibilidad**:
+
 - **Logs SYSTEM**: Solo visibles para administradores
 - **Logs USUARIO**: Cada usuario ve solo los suyos, administradores ven todos
 
 **Validaciones**:
+
 - Logs tipo "SYSTEM" deben tener `usuario_id = NULL`
 - Logs tipo "USUARIO" deben tener `usuario_id` válido
 
@@ -428,7 +443,7 @@ def endpoint(db: Session = Depends(get_db)):
 
 ### Diagrama de Relaciones
 
-```
+```text
 Empresa (1) ──── (N) Usuario
    │                │
    │                └── (1) ──── (N) Venta
@@ -458,36 +473,43 @@ Transaccion (N) ──── (1) Producto | Usuario
 ### Relaciones Detalladas
 
 #### Usuario ↔ Empresa
+
 - **Tipo**: Many-to-One (N:1)
 - **Descripción**: Un usuario pertenece a una empresa, una empresa puede tener múltiples usuarios
 - **FK**: `usuarios.empresa_id → empresas.id`
 
 #### Venta ↔ Usuario
+
 - **Tipo**: Many-to-One (N:1)
 - **Descripción**: Una venta es registrada por un usuario, un usuario puede registrar múltiples ventas
 - **FK**: `ventas.usuario_id → usuarios.id`
 
 #### DetalleVenta ↔ Venta
+
 - **Tipo**: Many-to-One (N:1)
 - **Descripción**: Un detalle pertenece a una venta, una venta tiene múltiples detalles
 - **FK**: `detalle_ventas.venta_id → ventas.id`
 
 #### DetalleVenta ↔ Producto
+
 - **Tipo**: Many-to-One (N:1)
 - **Descripción**: Un detalle referencia un producto, un producto puede estar en múltiples detalles
 - **FK**: `detalle_ventas.producto_id → productos.id`
 
 #### Inventario ↔ Producto
+
 - **Tipo**: One-to-Many (1:N)
 - **Descripción**: Un producto puede tener múltiples registros de inventario (por ubicación, lote, etc.)
 - **FK**: `inventario.producto_id → productos.id`
 
 #### Log ↔ Usuario
+
 - **Tipo**: Many-to-One (N:1)
 - **Descripción**: Un log puede estar asociado a un usuario (o NULL para logs del sistema), un usuario puede tener múltiples logs
 - **FK**: `logs.usuario_id → usuarios.id`
 
 #### Log ↔ TipoLog
+
 - **Tipo**: Many-to-One (N:1)
 - **Descripción**: Un log pertenece a un tipo específico, un tipo puede tener múltiples logs
 - **FK**: `logs.tipo_log_id → tipos_log.id`
@@ -499,6 +521,7 @@ Transaccion (N) ──── (1) Producto | Usuario
 ### Validaciones a Nivel de Base de Datos
 
 #### Restricciones UNIQUE
+
 - `usuarios.username` - Nombres de usuario únicos
 - `usuarios.email` - Emails únicos por usuario
 - `empresas.ruc` - RUC único por empresa
@@ -508,10 +531,12 @@ Transaccion (N) ──── (1) Producto | Usuario
 - `ventas.numero_venta` - Números de venta únicos
 
 #### Restricciones NOT NULL
+
 - Campos obligatorios marcados como NOT NULL
 - Claves foráneas obligatorias para integridad referencial
 
 #### Restricciones CHECK (implementables)
+
 ```sql
 -- Validar que cantidad_reservada <= cantidad_actual
 ALTER TABLE inventario ADD CONSTRAINT chk_inventario_cantidades 
@@ -529,6 +554,7 @@ CHECK (total > 0);
 ### Validaciones con Pydantic
 
 #### Validaciones de Formato
+
 - **Email**: Formato válido usando `EmailStr`
 - **Teléfono**: Patrón regex `^[\+0-9\-\s\(\)]+$`
 - **RUC**: Patrón regex `^[0-9-]+$`
@@ -536,16 +562,19 @@ CHECK (total > 0);
 - **Username**: Patrón regex `^[a-zA-Z0-9_]+$`
 
 #### Validaciones de Longitud
+
 - **Nombres**: Min 1, Max según tabla
 - **Descripciones**: Max 500-1000 caracteres
 - **Códigos**: Min 1, Max 50 caracteres
 
 #### Validaciones de Rango
+
 - **Decimales**: `ge=0` (mayor o igual a cero)
 - **Enteros**: `gt=0` (mayor a cero) para IDs
 - **Stock**: `ge=0` (no negativo)
 
 #### Validaciones Complejas (Root Validators)
+
 - **Precios**: Precio venta ≥ precio compra
 - **Stock**: cantidad_disponible = cantidad_actual - cantidad_reservada
 - **Totales**: Cálculo automático de subtotales y totales
@@ -558,9 +587,11 @@ CHECK (total > 0);
 ### Índices Principales
 
 #### Índices de Clave Primaria
+
 - Automáticos en todos los campos `id`
 
 #### Índices Únicos
+
 - `usuarios.username`
 - `usuarios.email`
 - `empresas.ruc`
@@ -570,18 +601,22 @@ CHECK (total > 0);
 - `ventas.numero_venta`
 
 #### Índices de Búsqueda
+
 - `productos.nombre` - Búsquedas de productos
 - `empresas.nombre` - Búsquedas de empresas
 - `ventas.fecha_venta` - Reportes por fecha
 - `ventas.cliente_nombre` - Búsquedas de clientes
 
 #### Índices de Clave Foránea
+
 SQLAlchemy crea automáticamente índices para mejorar JOINs:
+
 - Todas las relaciones `*_id` tienen índices implícitos
 
 ### Estrategias de Optimización
 
 #### Consultas Frecuentes
+
 ```sql
 -- Búsqueda de productos por código (INDEXED)
 SELECT * FROM productos WHERE codigo = 'PROD001';
@@ -598,6 +633,7 @@ WHERE usuario_id = 1
 ```
 
 #### Paginación Eficiente
+
 ```python
 # Uso de LIMIT/OFFSET con ORDER BY para paginación
 query = session.query(Producto)\
@@ -615,6 +651,7 @@ query = session.query(Producto)\
 Cada entidad tiene 4 tipos de esquemas:
 
 #### 1. BaseSchema
+
 ```python
 class ProductoBase(BaseModel):
     # Campos comunes para create/update
@@ -622,7 +659,8 @@ class ProductoBase(BaseModel):
     # ... otros campos
 ```
 
-#### 2. CreateSchema  
+#### 2. CreateSchema
+
 ```python
 class ProductoCreate(ProductoBase):
     # Hereda de Base + campos obligatorios para creación
@@ -630,6 +668,7 @@ class ProductoCreate(ProductoBase):
 ```
 
 #### 3. UpdateSchema
+
 ```python
 class ProductoUpdate(BaseModel):
     # Todos los campos opcionales para actualizaciones parciales
@@ -638,6 +677,7 @@ class ProductoUpdate(BaseModel):
 ```
 
 #### 4. ResponseSchema
+
 ```python
 class Producto(ProductoBase):
     # Hereda de Base + campos de respuesta (id, fechas, relaciones)
@@ -652,6 +692,7 @@ class Producto(ProductoBase):
 ### Validaciones Implementadas
 
 #### Validators Simples
+
 ```python
 @validator('codigo')
 def validar_codigo(cls, v):
@@ -661,6 +702,7 @@ def validar_codigo(cls, v):
 ```
 
 #### Root Validators
+
 ```python
 @root_validator
 def validar_precios(cls, values):
@@ -898,16 +940,19 @@ logs_error = crud_log.get_by_tipo(db, tipo_log_id=tipo_error.id)
 ## 🔒 Consideraciones de Seguridad
 
 ### Autenticación y Autorización
+
 - Contraseñas hasheadas (nunca en texto plano)
 - Validación de roles por `tipo_usuario_id`
 - Control de acceso por empresa (`empresa_id`)
 
 ### Integridad de Datos
+
 - Transacciones ACID para operaciones críticas
 - Validaciones tanto en Pydantic como en base de datos
 - Claves foráneas con restricciones de integridad referencial
 
 ### Auditoría
+
 - Campos `fecha_creacion` y `fecha_actualizacion` en todas las tablas
 - Registro de `fecha_ultimo_acceso` en usuarios
 - Trazabilidad de cambios por `usuario_id` en ventas
@@ -917,17 +962,20 @@ logs_error = crud_log.get_by_tipo(db, tipo_log_id=tipo_error.id)
 ## 🚀 Próximos Pasos y Mejoras
 
 ### Funcionalidades Adicionales
+
 1. **Historial de Cambios**: Tabla de auditoría para tracking completo
 2. **Reportes Avanzados**: Dashboard con métricas de negocio
 3. **Notificaciones**: Sistema de alertas automáticas
 
 ### Optimizaciones
+
 1. **Particionado**: Para tablas de alto volumen (ventas, inventario)
 2. **Índices Compuestos**: Para consultas específicas frecuentes  
 3. **Vistas Materializadas**: Para reportes complejos
 4. **Cache**: Implementar Redis para consultas frecuentes
 
 ### Integrations
+
 1. **ERP Integration**: Conexión con sistemas externos
 2. **E-commerce**: Sincronización con tiendas online
 3. **Contabilidad**: Integración con sistemas contables
@@ -938,6 +986,7 @@ logs_error = crud_log.get_by_tipo(db, tipo_log_id=tipo_error.id)
 ## 📞 Soporte y Documentación
 
 Para más información sobre la implementación, consultar:
+
 - `app/src/database/models.py` - Modelos SQLAlchemy
 - `app/src/database/schemas.py` - Esquemas Pydantic  
 - `docs/api/` - Documentación de endpoints
@@ -954,6 +1003,7 @@ El sistema implementa un **registro de auditoría inmutable** que captura todas 
 ### Características Principales
 
 #### Inmutabilidad
+
 - **No se pueden modificar**: Una vez creado, un log no puede ser editado
 - **No se pueden eliminar**: Los logs son permanentes, ni siquiera los administradores pueden borrarlos
 - **Solo lectura**: Las operaciones permitidas son CREATE y READ únicamente
@@ -961,6 +1011,7 @@ El sistema implementa un **registro de auditoría inmutable** que captura todas 
 #### Clasificación de Logs
 
 **Por Tipo** (`TipoLog`):
+
 - `ERROR`: Errores críticos que afectan la funcionalidad
 - `WARNING`: Advertencias que requieren atención pero no bloquean operaciones
 - `INFO`: Información sobre acciones normales del sistema
@@ -968,6 +1019,7 @@ El sistema implementa un **registro de auditoría inmutable** que captura todas 
 - `SIGNUP`: Registro de creación de nuevos usuarios
 
 **Por Origen** (`usuario_tipo`):
+
 - `SYSTEM`: Logs generados automáticamente por el sistema (sin usuario_id)
 - `USUARIO`: Logs asociados a acciones de usuarios específicos (con usuario_id)
 
@@ -985,7 +1037,7 @@ El sistema implementa un **registro de auditoría inmutable** que captura todas 
 
 ### Endpoints de API
 
-```
+```text
 GET /logs/              # Lista logs según permisos del usuario
 GET /logs/me            # Logs del usuario actual
 GET /logs/system        # Logs del sistema (solo admin)
@@ -1074,6 +1126,7 @@ LogCreate(
 ### Casos de Uso
 
 #### 1. Auditoría de Seguridad
+
 ```python
 # Registrar intentos de login fallidos
 log_warning(
@@ -1092,6 +1145,7 @@ log_info(
 ```
 
 #### 2. Trazabilidad de Operaciones
+
 ```python
 # Registrar creación de venta
 log_info(
@@ -1111,6 +1165,7 @@ log_info(
 ```
 
 #### 3. Monitoreo del Sistema
+
 ```python
 # Errores críticos
 try:
@@ -1163,6 +1218,7 @@ usuarios_activos = db.query(
 ### Tests Automatizados
 
 El sistema incluye **26 tests automatizados** que validan:
+
 - ✅ Creación de logs SYSTEM y USUARIO
 - ✅ Validaciones de integridad referencial
 - ✅ Inmutabilidad (bloqueo de UPDATE y DELETE)
@@ -1173,4 +1229,35 @@ El sistema incluye **26 tests automatizados** que validan:
 
 ---
 
-*Documentación actualizada el 18 de Noviembre de 2025*
+## 🎲 Generación de Datos de Prueba
+
+El sistema cuenta con herramientas para poblar la base de datos con información ficticia para propósitos de desarrollo y pruebas de carga.
+
+### Scripts Disponibles
+
+#### `seed.py`
+
+Es el orquestador principal. Realiza las siguientes tareas en orden:
+
+1. **Inicialización de Esquema**: Crea todas las tablas definidas en `models.py`.
+2. **Datos Base**: Carga tipos y estados necesarios (ej. `TipoUsuario`, `EstadoVenta`) y crea el usuario administrador por defecto.
+3. **Datos Falsos**: Invoca a `fake_data.py` para generar volumen de datos.
+
+#### `app/src/database/fake_data.py`
+
+Utiliza la librería `faker` para generar datos realistas:
+
+- **Clientes**: Nombres, direcciones, teléfonos y documentos de identidad.
+- **Productos**: Nombres comerciales, descripciones, precios y stock.
+- **Inventario**: Asignación de stock inicial y ubicaciones.
+- **Ventas**: Generación de transacciones históricas con fechas pasadas, asociadas a clientes y productos aleatorios, calculando totales e impuestos correctamente.
+
+### Ejecución
+
+```powershell
+python seed.py
+```
+
+---
+
+Documentación actualizada el 20 de Noviembre de 2025

@@ -16,6 +16,8 @@ from app.src.routers import stats as stats_router
 from app.src.routers import logs as logs_router
 from app.src.routers import transacciones as transacciones_router
 from app.src.routers import compras as compras_router
+from app.src.routers import ventas as ventas_router
+from app.src.routers import clientes as clientes_router
 
 
 settings = get_settings()
@@ -52,6 +54,8 @@ app.include_router(stats_router.router)
 app.include_router(logs_router.router)
 app.include_router(transacciones_router.router)
 app.include_router(compras_router.router)
+app.include_router(ventas_router.router)
+app.include_router(clientes_router.router)
 
 # Exception handlers
 register_exception_handlers(app)

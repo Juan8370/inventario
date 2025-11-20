@@ -155,6 +155,26 @@ python -c "import secrets; print(secrets.token_hex(32))"
 openssl rand -hex 32
 ```
 
+### 2. Semilla de Datos (Seeding)
+
+Para facilitar el desarrollo y las pruebas manuales, el proyecto incluye un script para poblar la base de datos con datos ficticios pero realistas.
+
+**Entidades generadas:**
+- Usuarios (Admin por defecto)
+- Clientes (20 registros)
+- Productos (10 registros)
+- Inventario (Stock inicial)
+- Ventas (30 transacciones históricas)
+
+**Ejecutar el seed:**
+
+```powershell
+# Asegúrate de estar en el entorno virtual
+python seed.py
+```
+
+**Nota**: Este script eliminará y recreará las tablas si es necesario, o agregará datos si la base está vacía. Es recomendable usarlo en una base de datos limpia (`inventario.db`).
+
 Ver `config.md` para más detalles sobre configuración.
 
 Notas importantes:

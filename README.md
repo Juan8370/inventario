@@ -83,6 +83,11 @@ py -m venv .venv
 pip install -r requirements.txt
 # Desarrollo: pip install -r requirements-dev.txt
 Copy-Item .env.example .env
+
+# (Opcional) Poblar base de datos con datos de prueba
+python seed.py
+
+# Iniciar servidor
 py run.py
 ```
 

@@ -170,10 +170,27 @@ class Usuario(Base):
     empresa = relationship("Empresa", back_populates="usuarios")
     tipo_usuario = relationship("TipoUsuario", back_populates="usuarios")
     estado_usuario = relationship("EstadoUsuario", back_populates="usuarios")
-    ventas = relationship("Venta", back_populates="usuario")
+    ventas = relationship("Venta", back_populates="vendedor")
     logs = relationship("Log", back_populates="usuario")
     transacciones = relationship("Transaccion", back_populates="usuario")
     compras = relationship("Compra", back_populates="usuario")
+
+class Cliente(Base):
+    __tablename__ = "clientes"
+    
+    id = Column(Integer, primary_key=True, index=True)
+    nombre = Column(String(100), nullable=False)
+    apellido = Column(String(100), nullable=False)
+    direccion = Column(Text)
+    telefono = Column(String(20))
+    descripcion = Column(Text)
+    identidad = Column(String(20), unique=True, nullable=False)
+    email = Column(String(100))
+    fecha_creacion = Column(DateTime, default=datetime.utcnow)
+    fecha_actualizacion = Column(DateTime, default=datetime.utcnow, onupdate=datetime.utcnow)
+    
+    # Relaciones
+    ventas = relationship("Venta", back_populates="cliente")
 
 class Empleado(Base):
     __tablename__ = "empleados"
@@ -246,25 +263,19 @@ class Venta(Base):
     __tablename__ = "ventas"
     
     id = Column(Integer, primary_key=True, index=True)
-    numero_venta = Column(String(50), unique=True, nullable=False, index=True)
-    cliente_nombre = Column(String(200), nullable=False)
-    cliente_documento = Column(String(20))
-    cliente_telefono = Column(String(20))
-    cliente_email = Column(String(100))
-    cliente_direccion = Column(Text)
-    subtotal = Column(Numeric(10, 2), nullable=False)
-    impuesto = Column(Numeric(10, 2), default=0)
-    descuento = Column(Numeric(10, 2), default=0)
-    total = Column(Numeric(10, 2), nullable=False)
-    fecha_venta = Column(DateTime, default=datetime.utcnow)
-    usuario_id = Column(Integer, ForeignKey("usuarios.id"))
+    factura_id = Column(String(50), unique=True, nullable=False, index=True)
+    cliente_id = Column(Integer, ForeignKey("clientes.id"))
+    fecha = Column(DateTime, default=datetime.utcnow)
+    valor_total = Column(Numeric(10, 2), nullable=False)
+    vendedor_id = Column(Integer, ForeignKey("usuarios.id"))
     estado_venta_id = Column(Integer, ForeignKey("estados_venta.id"))
     observaciones = Column(Text)
     fecha_creacion = Column(DateTime, default=datetime.utcnow)
     fecha_actualizacion = Column(DateTime, default=datetime.utcnow, onupdate=datetime.utcnow)
     
     # Relaciones
-    usuario = relationship("Usuario", back_populates="ventas")
+    cliente = relationship("Cliente", back_populates="ventas")
+    vendedor = relationship("Usuario", back_populates="ventas")
     estado_venta = relationship("EstadoVenta", back_populates="ventas")
     detalle_ventas = relationship("DetalleVenta", back_populates="venta")
 

@@ -552,6 +552,14 @@ from app.src.database import models, schemas
 
 # CRUD para tipos y estados
 crud_tipo_log = CRUDBase[models.TipoLog, schemas.TipoLogCreate, schemas.TipoLogCreate](models.TipoLog)
+crud_tipo_usuario = CRUDBase[models.TipoUsuario, schemas.TipoUsuarioCreate, schemas.TipoUsuarioCreate](models.TipoUsuario)
+crud_estado_usuario = CRUDBase[models.EstadoUsuario, schemas.EstadoUsuarioCreate, schemas.EstadoUsuarioCreate](models.EstadoUsuario)
+crud_tipo_producto = CRUDBase[models.TipoProducto, schemas.TipoProductoCreate, schemas.TipoProductoCreate](models.TipoProducto)
+crud_estado_producto = CRUDBase[models.EstadoProducto, schemas.EstadoProductoCreate, schemas.EstadoProductoCreate](models.EstadoProducto)
+crud_estado_venta = CRUDBase[models.EstadoVenta, schemas.EstadoVentaCreate, schemas.EstadoVentaCreate](models.EstadoVenta)
+crud_tipo_empresa = CRUDBase[models.TipoEmpresa, schemas.TipoEmpresaCreate, schemas.TipoEmpresaCreate](models.TipoEmpresa)
+crud_estado_empresa = CRUDBase[models.EstadoEmpresa, schemas.EstadoEmpresaCreate, schemas.EstadoEmpresaCreate](models.EstadoEmpresa)
+crud_estado_empleado = CRUDBase[models.EstadoEmpleado, schemas.EstadoEmpleadoCreate, schemas.EstadoEmpleadoCreate](models.EstadoEmpleado)
 
 # CRUD para Log (inmutable)
 crud_log = CRUDLog[models.Log, schemas.LogCreate, None](models.Log)
@@ -741,7 +749,23 @@ class CRUDTransaccion(CRUDBase[ModelType, CreateSchemaType, UpdateSchemaType]):
         return sorted(productos_bajo_stock, key=lambda x: x["stock_actual"])
 
 
+class CRUDCliente(CRUDBase[models.Cliente, schemas.ClienteCreate, schemas.ClienteUpdate]):
+    """
+    CRUD para la gestión de clientes
+    """
+    pass
+
+
+class CRUDVenta(CRUDBase[models.Venta, schemas.VentaCreate, schemas.VentaUpdate]):
+    """
+    CRUD para la gestión de ventas con lógica de inventario
+    """
+    pass
+
+
 # Instancia de CRUD para transacciones
 crud_tipo_transaccion = CRUDBase[models.TipoTransaccion, schemas.TipoTransaccionCreate, schemas.TipoTransaccionCreate](models.TipoTransaccion)
 crud_transaccion = CRUDTransaccion[models.Transaccion, schemas.TransaccionCreate, schemas.TransaccionCreate](models.Transaccion)
+crud_cliente = CRUDCliente(models.Cliente)
+crud_venta = CRUDVenta(models.Venta)
 
